@@ -55,8 +55,23 @@ def admin_panel():
             "writing_submissions?select=*&order=created_at.desc&limit=1000",
         )
     except HTTPError as exc:
-        st.error(f"Database request failed (HTTP {exc.code}).")
-        st.caption("401: check Secret Key; 403: check access permissions; 404: check table exposure and name.")
+        # Display only allowlisted Supabase error fields, never raw responses or headers.
+        error_code = "unknown"
+        try:
+            error_body = json.loads(exc.read().decode("utf-8"))
+            if isinstance(error_body, dict):
+                candidate = error_body.get("code")
+                if isinstance(candidate, str) and len(candidate) <= 32 and candidate.replace("_", "").isalnum():
+                    error_code = candidate
+        except (ValueError, UnicodeError, OSError):
+            pass
+        st.error(f"Database request failed (HTTP {exc.code}; error code: {error_code}).")
+        if error_code == "PGRST205":
+            st.caption("Supabase cannot find writing_submissions in its API schema cache. Check table exposure and schema.")
+        elif exc.code == 404:
+            st.caption("The requested API endpoint or table was not found.")
+        elif exc.code in (401, 403):
+            st.caption("Check the server-side API key and database access permissions.")
         return
     except (URLError, TimeoutError):
         st.error("Database connection failed (network or timeout).")
