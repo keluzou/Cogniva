@@ -15,7 +15,11 @@ st.set_page_config(page_title="Cogniva Write", page_icon="📝")
 
 def db_request(method, path, payload=None):
     """Supabase REST calls are server-side only; never expose the secret key."""
-    url = st.secrets["SUPABASE_URL"].rstrip("/") + "/rest/v1/" + path
+    # Accept either the Supabase project URL or the full Data API URL.
+    base_url = str(st.secrets["SUPABASE_URL"]).strip().rstrip("/")
+    if base_url.endswith("/rest/v1"):
+        base_url = base_url[:-len("/rest/v1")]
+    url = base_url + "/rest/v1/" + path
     key = st.secrets["SUPABASE_KEY"]
     headers = {
         "apikey": key,
