@@ -1,15 +1,96 @@
 
 import csv
+import hmac
+import io
+import json
 import random
 import uuid
 from datetime import datetime
-from pathlib import Path
+from urllib.error import HTTPError, URLError
+from urllib.request import Request, urlopen
 
 import streamlit as st
 
 st.set_page_config(page_title="Cogniva Write", page_icon="📝")
 
-DATA_FILE = Path(__file__).resolve().parent / "cogniva_v04b_data.csv"
+def db_request(method, path, payload=None):
+    """Supabase REST calls are server-side only; never expose the secret key."""
+    url = st.secrets["SUPABASE_URL"].rstrip("/") + "/rest/v1/" + path
+    key = st.secrets["SUPABASE_KEY"]
+    headers = {
+        "apikey": key,
+        "Authorization": "Bearer " + key,
+        "Content-Type": "application/json",
+    }
+    if method == "POST":
+        headers["Prefer"] = "return=minimal,resolution=ignore-duplicates"
+    data = json.dumps(payload).encode("utf-8") if payload is not None else None
+    req = Request(url, data=data, headers=headers, method=method)
+    with urlopen(req, timeout=15) as response:
+        body = response.read()
+        return json.loads(body) if body else []
+
+
+def admin_panel():
+    st.subheader("Researcher Dashboard")
+    if not all(k in st.secrets for k in ("SUPABASE_URL", "SUPABASE_KEY", "ADMIN_PASSWORD")):
+        st.error("The researcher dashboard is not configured.")
+        return
+    if not st.session_state.get("admin_authenticated", False):
+        with st.form("admin_login"):
+            password = st.text_input("Administrator password", type="password")
+            login = st.form_submit_button("Sign in")
+        if login:
+            if hmac.compare_digest(password, st.secrets["ADMIN_PASSWORD"]):
+                st.session_state.admin_authenticated = True
+                st.rerun()
+            else:
+                st.error("Incorrect password.")
+        return
+    if st.button("Sign out"):
+        st.session_state.admin_authenticated = False
+        st.rerun()
+    try:
+        rows = db_request(
+            "GET",
+            "writing_submissions?select=*&order=created_at.desc&limit=1000",
+        )
+    except (HTTPError, URLError, TimeoutError, KeyError, ValueError):
+        st.error("Unable to load submissions. Check database configuration.")
+        return
+    st.write(f"Showing {len(rows)} most recent submissions (maximum 1,000).")
+    if not rows:
+        st.info("No submissions yet.")
+        return
+    st.dataframe(
+        [
+            {
+                "Participant ID": row.get("participant_id"),
+                "Submitted": row.get("created_at"),
+                "Condition": row.get("feedback_condition"),
+            }
+            for row in rows
+        ],
+        hide_index=True,
+        use_container_width=True,
+    )
+    st.caption("Essay text is hidden in the overview. Downloads contain full responses.")
+    output = io.StringIO()
+    writer = csv.DictWriter(output, fieldnames=list(rows[0].keys()), extrasaction="ignore")
+    writer.writeheader()
+    writer.writerows(rows)
+    st.download_button(
+        "Download submissions (CSV)",
+        data=output.getvalue().encode("utf-8-sig"),
+        file_name="cogniva_submissions.csv",
+        mime="text/csv",
+    )
+
+
+if st.query_params.get("admin") == "1":
+    st.title("Cogniva Write")
+    admin_panel()
+    st.stop()
 
 TOPIC = "Should university students use AI tools to support their learning?"
 
@@ -68,7 +149,7 @@ if "feedback_text" not in st.session_state:
 st.title("Cogniva")
 st.caption("Language · Cognition · AI")
 st.header("Cogniva Write")
-st.caption("Version 0.4b-1 · Two Feedback Conditions")
+st.caption("Version 0.5 · Two Feedback Conditions · Secure Submission Storage")
 st.divider()
 
 if st.session_state.stage == 1:
@@ -101,13 +182,15 @@ if st.session_state.stage == 1:
             "Continue to Feedback"
         )
 
-    st.write(f"Word count: {len(initial_essay.split())}")
+    st.write(f"English word count: {len(initial_essay.split())} / 100–150")
 
     if continue_button:
         word_count = len(initial_essay.split())
 
         if not participant_id.strip():
             st.warning("Please enter a Participant ID.")
+        elif any("\\u4e00" <= c <= "\\u9fff" for c in initial_essay):
+            st.warning("This task requires an English essay. Please write in English.")
         elif not 100 <= word_count <= 150:
             st.warning("Please write between 100 and 150 words.")
         else:
@@ -180,7 +263,9 @@ elif st.session_state.stage == 3:
     if submit_button:
         revised_word_count = len(revised_essay.split())
 
-        if not 100 <= revised_word_count <= 150:
+        if any("\\u4e00" <= c <= "\\u9fff" for c in revised_essay):
+            st.warning("Please revise your essay in English.")
+        elif not 100 <= revised_word_count <= 150:
             st.warning(
                 "Please keep your revision between 100 and 150 words."
             )
@@ -204,26 +289,22 @@ elif st.session_state.stage == 3:
                 "revised_confidence": revised_confidence,
             }
 
-            file_exists = DATA_FILE.exists()
-
-            with open(
-                DATA_FILE,
-                "a",
-                newline="",
-                encoding="utf-8-sig"
-            ) as file:
-                writer = csv.DictWriter(
-                    file,
-                    fieldnames=FIELDS
-                )
-
-                if not file_exists or DATA_FILE.stat().st_size == 0:
-                    writer.writeheader()
-
-                writer.writerow(record)
-
-            st.session_state.stage = 4
-            st.rerun()
+            if not all(k in st.secrets for k in ("SUPABASE_URL", "SUPABASE_KEY")):
+                st.error("Submission storage is not configured. Please contact the researcher.")
+            else:
+                # Keep one stable ID across retries to avoid duplicate submissions.
+                if "pending_record_id" not in st.session_state:
+                    st.session_state.pending_record_id = record["record_id"]
+                record["record_id"] = st.session_state.pending_record_id
+                record.pop("timestamp", None)  # Supabase supplies created_at.
+                try:
+                    db_request("POST", "writing_submissions?on_conflict=record_id", [record])
+                except (HTTPError, URLError, TimeoutError, KeyError, ValueError):
+                    st.error("Submission could not be confirmed. Please retry; your text is still here.")
+                else:
+                    st.session_state.stage = 4
+                    st.session_state.pop("pending_record_id", None)
+                    st.rerun()
 
 elif st.session_state.stage == 4:
     st.success("Your responses have been saved!")
@@ -243,4 +324,5 @@ elif st.session_state.stage == 4:
         st.session_state.initial_data = {}
         st.session_state.feedback_condition = None
         st.session_state.feedback_text = ""
+        st.session_state.pop("pending_record_id", None)
         st.rerun()
