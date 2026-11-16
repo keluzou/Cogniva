@@ -19,7 +19,6 @@ def db_request(method, path, payload=None):
     key = st.secrets["SUPABASE_KEY"]
     headers = {
         "apikey": key,
-        "Authorization": "Bearer " + key,
         "Content-Type": "application/json",
     }
     if method == "POST":
