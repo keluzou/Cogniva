@@ -40,7 +40,7 @@ def admin_panel():
             password = st.text_input("Administrator password", type="password")
             login = st.form_submit_button("Sign in")
         if login:
-            if hmac.compare_digest(password, st.secrets["ADMIN_PASSWORD"]):
+            if hmac.compare_digest(password.encode("utf-8"), str(st.secrets["ADMIN_PASSWORD"]).encode("utf-8")):
                 st.session_state.admin_authenticated = True
                 st.rerun()
             else:
