@@ -54,8 +54,15 @@ def admin_panel():
             "GET",
             "writing_submissions?select=*&order=created_at.desc&limit=1000",
         )
-    except (HTTPError, URLError, TimeoutError, KeyError, ValueError):
-        st.error("Unable to load submissions. Check database configuration.")
+    except HTTPError as exc:
+        st.error(f"Database request failed (HTTP {exc.code}).")
+        st.caption("401: check Secret Key; 403: check access permissions; 404: check table exposure and name.")
+        return
+    except (URLError, TimeoutError):
+        st.error("Database connection failed (network or timeout).")
+        return
+    except (KeyError, ValueError, TypeError):
+        st.error("Database configuration or response format error.")
         return
     st.write(f"Showing {len(rows)} most recent submissions (maximum 1,000).")
     if not rows:
