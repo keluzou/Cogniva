@@ -105,6 +105,10 @@ def _generate_feedback_core_once(essay):
         "background claims. Organization feedback must identify an actual "
         "break in logic or misplaced idea; do not suggest adding a transition "
         "when the logical connection is already clear. "
+        "Do not force two already coherent adjacent sentences into one; a "
+        "sentence merge is not an Organization improvement unless the current "
+        "logical relationship is genuinely ambiguous. Inspect the placement "
+        "of every sentence within its paragraph for topic continuity. "
         "Each suggestion must target one distinct issue and avoid overlap, even "
         "if two quotes differ. Do not give two suggestions that ask for the same "
         "examples or reasons. Organization suggestions must identify a genuine "
@@ -146,6 +150,9 @@ def _generate_feedback_core_once(essay):
         "Choose a grammatically correct strength_quote if possible; otherwise "
         "praise only the idea and explicitly acknowledge language errors. "
          "Check counterargument development separately from examples of benefits; retain a specific suggestion when a stated objection is not explained or answered. Never describe two positive claims as a balanced view. "
+         "For Organization, inspect paragraph-level topic continuity and "
+         "misplaced sentences before recommending a merge. An optional "
+         "sentence combination alone is not a substantive coherence fix. "
          "Before suggesting Content evidence, search the entire essay for "
         "existing examples or explanations. Before suggesting Organization "
         "changes, verify there is an actual cohesion problem. "
@@ -597,7 +604,7 @@ if "researcher_feedback_cache" not in st.session_state:
 st.title("Cogniva")
 st.caption("Language · Cognition · AI")
 st.header("Cogniva Write")
-st.caption("Version 1.5.3 · Structured Feedback Core · Secure Submission Storage")
+st.caption("Version 1.5.4 · Structured Feedback Core · Secure Submission Storage")
 test_mode = bool(st.session_state.get("researcher_test_mode", False) and st.session_state.get("admin_authenticated", False))
 if test_mode:
     st.warning("RESEARCHER TEST MODE — Responses will be marked as test data.")
@@ -807,7 +814,7 @@ elif st.session_state.stage == 3:
                 **st.session_state.initial_data,
                 "feedback_condition":
                     st.session_state.feedback_condition,
-                "feedback_type": "ai_generated_v1_5_3_test" if test_mode else "ai_generated_v1_5_3",
+                "feedback_type": "ai_generated_v1_5_4_test" if test_mode else "ai_generated_v1_5_4",
                 "feedback_text": st.session_state.feedback_text,
                 "feedback_word_count": len(
                     st.session_state.feedback_text.split()
