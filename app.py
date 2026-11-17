@@ -45,7 +45,7 @@ def openai_response(instructions, text):
         "model": "gpt-4.1-mini",
         "instructions": instructions,
         "input": text,
-        "max_output_tokens": 1600,
+        "max_output_tokens": 2400,
     }
     req = Request(
         "https://api.openai.com/v1/responses",
@@ -73,7 +73,7 @@ def openai_response(instructions, text):
     return answer
 
 
-def generate_feedback_core(essay):
+def _generate_feedback_core_once(essay):
     """Create structured, evidence-checked corrections before showing feedback."""
     import re
 
@@ -159,6 +159,17 @@ def generate_feedback_core(essay):
                 )
                 break
     return data
+
+
+def generate_feedback_core(essay):
+    """Retry malformed or invalid AI feedback once with a fresh generation."""
+    last_error = None
+    for _ in range(2):
+        try:
+            return _generate_feedback_core_once(essay)
+        except (ValueError, KeyError, TypeError) as exc:
+            last_error = exc
+    raise ValueError("Feedback validation failed after two attempts") from last_error
 
 
 def format_feedback_core(data):
@@ -370,7 +381,7 @@ if "researcher_feedback_cache" not in st.session_state:
 st.title("Cogniva")
 st.caption("Language · Cognition · AI")
 st.header("Cogniva Write")
-st.caption("Version 0.9.1 · Structured Feedback Core · Secure Submission Storage")
+st.caption("Version 0.9.2 · Structured Feedback Core · Secure Submission Storage")
 test_mode = bool(st.session_state.get("researcher_test_mode", False) and st.session_state.get("admin_authenticated", False))
 if test_mode:
     st.warning("RESEARCHER TEST MODE — Responses will be marked as test data.")
