@@ -93,5 +93,27 @@
         "gold_match": null
       }
     ]
+  },
+  {
+    "essay": "F",
+    "version": "v1.5.3",
+    "run_id": "F-observed-2",
+    "same_substantive_feedback": true,
+    "suggestions": [
+      {
+        "dimension": "Content",
+        "type": "Improvement",
+        "validity": "valid",
+        "false_correction": false,
+        "gold_match": "F-C1"
+      },
+      {
+        "dimension": "Organization",
+        "type": "Improvement",
+        "validity": "valid",
+        "false_correction": false,
+        "gold_match": null
+      }
+    ]
   }
 ]
