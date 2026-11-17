@@ -15,6 +15,8 @@ GOLD = {
     "F": {"Language": set(), "Content": {"F-C1", "F-C2"}, "Organization": set()},
     "G": {"Language": set(), "Content": set(), "Organization": set()},
     "H": {"Language": set(), "Content": set(), "Organization": {"H-O1"}},
+    "I": {"Language": set(), "Content": set(), "Organization": {"I-O1"}},
+    "J": {"Language": {"J-L1", "J-L2", "J-L3", "J-L4", "J-L5"}, "Content": set(), "Organization": set()},
 }
 LIMITS = {"Language": 3, "Content": 2, "Organization": 1}
 VALIDITY = {"valid", "borderline", "invalid"}
