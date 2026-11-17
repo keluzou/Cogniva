@@ -73,28 +73,41 @@ def openai_response(instructions, text):
 
 
 def generate_writing_feedback(essay, condition):
-    """Use one content analysis for both styles; do not disclose model prompts."""
+    """Generate shared evidence-based content, then vary interpersonal style."""
     core = openai_response(
-        "You are an EFL writing tutor. Examine the student's English essay on "
-        "university students using AI. Provide exactly 3-5 specific, actionable "
-        "revision points grounded in the submitted essay. Focus on genuine "
-        "grammar, vocabulary, coherence or argument issues. Quote only short "
-        "relevant phrases from the essay when useful. Do not invent mistakes. "
-        "Do not rewrite the whole essay, grade it, or mention the student's "
-        "ability. Use concise neutral English. Number each point.",
+        "You are an EFL writing tutor. Read the student's English essay carefully. "
+        "Produce two sections in concise, neutral English. "
+        "Section A, 'Writing strength': identify exactly ONE specific, genuine "
+        "strength and quote a short phrase from the essay as evidence. "
+        "Describe what works without praise or encouragement. "
+        "Section B, 'Revision suggestions': provide exactly FOUR numbered, "
+        "distinct and actionable suggestions based on real issues in the essay. "
+        "Avoid overlapping corrections or repeating the same issue. "
+        "Give accurate original-to-corrected examples where appropriate. "
+        "Do not invent errors, rewrite the entire essay, or assign a grade. "
+        "Avoid generic compliments. Keep the content clear and concise.",
         essay,
     )
     if condition == "neutral":
         return core
     return openai_response(
-        "Rewrite the following EFL writing feedback in a supportive, "
-        "encouraging tone. Preserve EVERY numbered revision point, factual "
-        "claim, example, correction and suggestion exactly in substance. "
-        "Do not add or remove advice, corrections, praise of writing quality, "
-        "or new examples. Use brief encouragement only as framing. "
-        "Keep the same numbered structure and similar length.",
-        core,
+        "Rewrite the supplied writing feedback into a warm, enthusiastic, "
+        "supportive message for an EFL learner. In the 'Writing strength' "
+        "section, praise the SPECIFIC genuine strength already identified, "
+        "explain why it works, and celebrate it naturally. Use expressive "
+        "exclamation marks and 1-3 friendly emojis (for example 🌟 👏 ✨) "
+        "in the praise section. A brief friendly internet expression such as "
+        "'Nice work!' is welcome, but avoid exaggerated slang or claims "
+        "about the student's overall ability. In the 'Revision suggestions' "
+        "section, keep the EXACT SAME four numbered issues, corrections, "
+        "examples and actionable advice. Make their wording constructive "
+        "and encouraging without adding new information. Do not invent "
+        "strengths or errors. Do not add extra revision points. "
+        "Use emojis primarily in the praise section. "
+        "Here is the shared factual feedback:\\n\\n" + core,
+        "Rewrite the provided feedback while preserving its factual content.",
     )
+
 
 
 def admin_panel():
