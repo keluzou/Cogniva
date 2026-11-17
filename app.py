@@ -128,6 +128,19 @@ def admin_panel():
         return
     if st.button("Sign out"):
         st.session_state.admin_authenticated = False
+        st.session_state.researcher_test_mode = False
+        st.rerun()
+    st.divider()
+    st.subheader("Researcher Test Mode")
+    st.caption("Test mode is available only after administrator sign-in in this browser session.")
+    if st.button("Start researcher test", type="primary"):
+        st.session_state.researcher_test_mode = True
+        st.session_state.stage = 1
+        st.session_state.initial_data = {}
+        st.session_state.feedback_condition = None
+        st.session_state.feedback_text = ""
+        st.session_state.pop("pending_record_id", None)
+        st.query_params.clear()
         st.rerun()
     try:
         rows = db_request(
@@ -169,6 +182,7 @@ def admin_panel():
                 "Participant ID": row.get("participant_id"),
                 "Submitted": row.get("created_at"),
                 "Condition": row.get("feedback_condition"),
+                "Record type": "TEST" if str(row.get("feedback_type", "")).endswith("_test") else "Other",
             }
             for row in rows
         ],
@@ -251,6 +265,24 @@ st.title("Cogniva")
 st.caption("Language · Cognition · AI")
 st.header("Cogniva Write")
 st.caption("Version 0.6 · AI Writing Feedback · Secure Submission Storage")
+test_mode = bool(st.session_state.get("researcher_test_mode", False) and st.session_state.get("admin_authenticated", False))
+if test_mode:
+    st.warning("RESEARCHER TEST MODE — Responses will be marked as test data.")
+    chosen_condition = st.radio(
+        "Choose feedback condition for this test:",
+        ["supportive", "neutral"],
+        horizontal=True,
+        key="researcher_condition",
+        disabled=st.session_state.stage != 1,
+    )
+    if st.button("Exit test mode"):
+        st.session_state.researcher_test_mode = False
+        st.session_state.stage = 1
+        st.session_state.initial_data = {}
+        st.session_state.feedback_condition = None
+        st.session_state.feedback_text = ""
+        st.session_state.pop("pending_record_id", None)
+        st.rerun()
 st.divider()
 
 if st.session_state.stage == 1:
@@ -296,15 +328,15 @@ if st.session_state.stage == 1:
             st.warning("Please write between 100 and 150 words.")
         else:
             st.session_state.initial_data = {
-                "participant_id": participant_id.strip(),
+                "participant_id": ("TEST_" + participant_id.strip()) if test_mode else participant_id.strip(),
                 "initial_essay": initial_essay,
                 "initial_word_count": word_count,
                 "initial_score": initial_score,
                 "initial_confidence": initial_confidence,
             }
 
-            # Random assignment for prototype testing.
-            condition = random.choice(["supportive", "neutral"])
+            # Only authenticated researchers can override random assignment.
+            condition = chosen_condition if test_mode else random.choice(["supportive", "neutral"])
             st.session_state.feedback_condition = condition
 
             if "OPENAI_API_KEY" not in st.secrets:
@@ -398,7 +430,7 @@ elif st.session_state.stage == 3:
                 **st.session_state.initial_data,
                 "feedback_condition":
                     st.session_state.feedback_condition,
-                "feedback_type": "ai_generated_v0_6",
+                "feedback_type": "ai_generated_v0_6_test" if test_mode else "ai_generated_v0_6",
                 "feedback_text": st.session_state.feedback_text,
                 "feedback_word_count": len(
                     st.session_state.feedback_text.split()
