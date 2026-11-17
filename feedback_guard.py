@@ -29,7 +29,7 @@ def is_known_false_correction(original, replacement):
     # Repeating "how to" in a coordinated infinitival complement is
     # optional, not a repair of parallel structure.
     repeated_how_to = re.sub(
-        r"\\band\\s+how\\s+to\\s+", "and ", replacement,
+        r"\band\s+how\s+to\s+", "and ", replacement,
         count=1, flags=re.I
     )
     if repeated_how_to != replacement and repeated_how_to.casefold() == original.casefold():
