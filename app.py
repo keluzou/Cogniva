@@ -101,6 +101,9 @@ def _generate_feedback_core_once(essay):
         "just because it is short, especially for a 100-150 word essay. "
         "If a text is grammatically correct but weakly argued, give specific "
         "Content suggestions rather than inventing grammar mistakes. "
+        "Select a meaningful writing strength showing a balanced position, "
+        "specific support, reasoning, or effective structure. Avoid trivial "
+        "generic claims such as AI is convenient. "
         "Choose a strength_quote that is grammatically correct whenever "
         "possible. If no such quote exists, explicitly praise the IDEA rather "
         "than language correctness, and acknowledge that the wording needs "
@@ -121,6 +124,8 @@ def _generate_feedback_core_once(essay):
          "Preserve up to 8 distinct Language candidates from throughout the essay; "
         "the application selects at most 3 across paragraphs and categories. "
         "Keep at most 2 Content and 1 Organization items. "
+        "Do not select a trivial fact as the main writing strength. Prefer "
+        "a meaningful claim, nuanced stance, reasoning, or concrete example. "
         "Choose a grammatically correct strength_quote if possible; otherwise "
         "praise only the idea and explicitly acknowledge language errors. "
         "Remove invented, redundant, vague, or unsupported items. For Content and "
@@ -134,15 +139,63 @@ def _generate_feedback_core_once(essay):
         raise ValueError("Feedback is not valid JSON") from exc
     if not isinstance(data, dict) or not isinstance(data.get("suggestions"), list):
         raise ValueError("Invalid feedback structure")
+    # A targeted second pass finds genuine language errors in paragraphs
+    # missed by the full-essay reviewer. This is only needed when coverage
+    # is concentrated in one paragraph.
+    paragraph_texts = [p for p in essay.split("\n\n") if p.strip()]
+    existing_language = [
+        item for item in data["suggestions"]
+        if isinstance(item, dict) and item.get("dimension") == "Language"
+    ]
+    covered = {
+        next((i for i, paragraph in enumerate(paragraph_texts)
+              if item.get("original", "") in paragraph), -1)
+        for item in existing_language
+    }
+    if len(paragraph_texts) > 1 and len(covered - {-1}) < min(3, len(paragraph_texts)):
+        missing = [
+            {"paragraph": i + 1, "text": paragraph}
+            for i, paragraph in enumerate(paragraph_texts)
+            if i not in covered
+        ]
+        extra = openai_response(
+            "Check ONLY the provided paragraphs for genuine grammatical errors. "
+            "Return ONLY a JSON object with suggestions: a list of zero to six "
+            "objects with exactly dimension ('Language'), type ('Correction'), "
+            "category, original, replacement, explanation. Each original must "
+            "be an exact substring of its paragraph, replacement must be "
+            "grammatically correct in context. No optional style edits. "
+            "Prefer different error categories. Do not invent errors.",
+            json.dumps(missing, ensure_ascii=False),
+        )
+        try:
+            extra_data = json.loads(extra)
+            extras = extra_data.get("suggestions", [])
+            if isinstance(extras, list):
+                existing_quotes = {
+                    item.get("original") for item in data["suggestions"]
+                    if isinstance(item, dict)
+                }
+                for item in extras:
+                    if (isinstance(item, dict)
+                            and item.get("dimension") == "Language"
+                            and item.get("type") == "Correction"
+                            and isinstance(item.get("original"), str)
+                            and item["original"] in essay
+                            and item["original"] not in existing_quotes):
+                        data["suggestions"].append(item)
+                        existing_quotes.add(item["original"])
+        except (ValueError, TypeError, AttributeError):
+            pass  # Retain the independently reviewed core if supplement is invalid.
     # Select language targets from across the essay, not simply the first three.
     # Selection is deterministic for the same reviewed feedback core.
     limits = {"Language": 3, "Content": 2, "Organization": 1}
-    paragraphs = [p for p in essay.split("\\n\\n") if p.strip()]
+    paragraphs = [p for p in essay.split("\n\n") if p.strip()]
     def paragraph_index(evidence):
         position = essay.find(evidence)
         if position < 0:
             return len(paragraphs)
-        return essay[:position].count("\\n\\n")
+        return essay[:position].count("\n\n")
 
     candidates = data["suggestions"]
     for item in candidates:
@@ -492,7 +545,7 @@ if "researcher_feedback_cache" not in st.session_state:
 st.title("Cogniva")
 st.caption("Language · Cognition · AI")
 st.header("Cogniva Write")
-st.caption("Version 1.3.1 · Structured Feedback Core · Secure Submission Storage")
+st.caption("Version 1.4 · Structured Feedback Core · Secure Submission Storage")
 test_mode = bool(st.session_state.get("researcher_test_mode", False) and st.session_state.get("admin_authenticated", False))
 if test_mode:
     st.warning("RESEARCHER TEST MODE — Responses will be marked as test data.")
@@ -698,7 +751,7 @@ elif st.session_state.stage == 3:
                 **st.session_state.initial_data,
                 "feedback_condition":
                     st.session_state.feedback_condition,
-                "feedback_type": "ai_generated_v1_3_test" if test_mode else "ai_generated_v1_3",
+                "feedback_type": "ai_generated_v1_4_test" if test_mode else "ai_generated_v1_4",
                 "feedback_text": st.session_state.feedback_text,
                 "feedback_word_count": len(
                     st.session_state.feedback_text.split()
