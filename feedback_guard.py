@@ -26,6 +26,14 @@ def is_known_false_correction(original, replacement):
     ai_expanded = re.sub(r"\bAI\b", "AI tools", original, count=1)
     if ai_expanded != original and ai_expanded.casefold() == replacement.casefold():
         return True
+    # Repeating "how to" in a coordinated infinitival complement is
+    # optional, not a repair of parallel structure.
+    repeated_how_to = re.sub(
+        r"\\band\\s+how\\s+to\\s+", "and ", replacement,
+        count=1, flags=re.I
+    )
+    if repeated_how_to != replacement and repeated_how_to.casefold() == original.casefold():
+        return True
     # Changing certainty is not a grammatical repair.
     for source, target in (("are", "can be"), ("is", "can be"), ("may", "can")):
         changed = re.sub(r"\b" + source + r"\b", target, original, count=1, flags=re.I)
