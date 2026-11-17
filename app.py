@@ -67,7 +67,7 @@ def openai_response(instructions, text):
         for part in item.get("content", [])
         if part.get("type") == "output_text"
     ]
-    answer = "\\n".join(parts).strip()
+    answer = "\n".join(parts).strip()
     if not answer:
         raise ValueError("Empty AI response")
     return answer
@@ -98,7 +98,7 @@ def generate_feedback_core(essay):
         "Return ONLY a valid JSON object with the SAME schema: strength_quote, "
         "strength_explanation, suggestions (exactly four objects with category, "
         "original, replacement, explanation). Do not include markdown.",
-        "ORIGINAL ESSAY:\\n" + essay + "\\n\\nDRAFT JSON:\\n" + draft,
+        "ORIGINAL ESSAY:\n" + essay + "\n\nDRAFT JSON:\n" + draft,
     )
     try:
         data = json.loads(reviewed)
@@ -145,7 +145,7 @@ def format_feedback_core(data):
             f'{i}. {item["category"]}: Replace "{item["original"]}" '
             f'with "{item["replacement"]}". {item["explanation"]}'
         )
-    return "\\n".join(lines)
+    return "\n".join(lines)
 
 
 def style_feedback(core, condition):
@@ -174,7 +174,7 @@ def style_feedback(core, condition):
     except (ValueError, KeyError, TypeError):
         raise ValueError("Invalid supportive wording")
     corrections = factual.split("Revision suggestions:", 1)[1]
-    return "Writing strength:\\n" + opening + "\\n\\nRevision suggestions:" + corrections + "\\n\\n" + closing
+    return "Writing strength:\n" + opening + "\n\nRevision suggestions:" + corrections + "\n\n" + closing
 
 
 def generate_writing_feedback(essay, condition):
