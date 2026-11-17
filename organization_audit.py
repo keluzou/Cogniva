@@ -47,13 +47,13 @@ def validate_organization_issue(essay, issue):
     action = issue["replacement"].lower()
     if (not essay[:source_position].strip()
             and re.search(
-                r"\\b(move|relocate|place|put|shift)\\b", action
+                r"\b(move|relocate|place|put|shift)\b", action
             )
             and re.search(
-                r"\\b(beginning|start|opening|first sentence)\\b"
-                r".{0,30}\\b(essay|text|introduction)\\b"
-                r"|\\b(essay|text|introduction)\\b"
-                r".{0,30}\\b(beginning|start|opening)\\b",
+                r"\b(beginning|start|opening|first sentence)\b"
+                r".{0,30}\b(essay|text|introduction)\b"
+                r"|\b(essay|text|introduction)\b"
+                r".{0,30}\b(beginning|start|opening)\b",
                 action
             )):
         return None
