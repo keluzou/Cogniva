@@ -106,11 +106,8 @@ def generate_feedback_core(essay):
         "ORIGINAL ESSAY:\n" + essay + "\n\nDRAFT FEEDBACK:\n" + draft,
     )
     import re
-    numbered = re.findall(r"(?m)^\\s*[1-4]\\.\\s+", reviewed)
-    if len(numbered) != 4 or not all(
-        re.search(r"(?m)^\\s*" + str(i) + r"\\.\\s+", reviewed)
-        for i in range(1, 5)
-    ):
+    numbered = re.findall(r"(?m)^\s*([1-4])[.)]\s+", reviewed)
+    if sorted(numbered) != ["1", "2", "3", "4"]:
         raise ValueError("Feedback review did not return four numbered suggestions")
     return reviewed
 
