@@ -125,18 +125,27 @@ def _generate_feedback_core_once(essay):
         raise ValueError("Feedback is not valid JSON") from exc
     if not isinstance(data, dict) or not isinstance(data.get("suggestions"), list):
         raise ValueError("Invalid feedback structure")
-    suggestions = data["suggestions"]
-    if len(suggestions) > 6:
-        # Keep the highest-priority six rather than fail the entire response.
-        suggestions = suggestions[:6]
-        data["suggestions"] = suggestions
+    # Keep the configured cap per dimension rather than rejecting a useful core.
+    limits = {"Language": 3, "Content": 2, "Organization": 1}
+    selected = []
+    counts = {name: 0 for name in limits}
+    for item in data["suggestions"]:
+        if not isinstance(item, dict):
+            raise ValueError("Invalid feedback item")
+        dimension = item.get("dimension")
+        if dimension not in limits:
+            raise ValueError("Unknown feedback dimension")
+        if counts[dimension] < limits[dimension]:
+            selected.append(item)
+            counts[dimension] += 1
+    suggestions = selected
+    data["suggestions"] = suggestions
     quote = data.get("strength_quote")
     explanation = data.get("strength_explanation")
     if not isinstance(quote, str) or not quote.strip() or quote not in essay:
         raise ValueError("Strength evidence not found in essay")
     if not isinstance(explanation, str) or not explanation.strip():
         raise ValueError("Missing strength explanation")
-    counts = {"Language": 0, "Content": 0, "Organization": 0}
     seen = set()
     import re
     for item in suggestions:
@@ -150,9 +159,6 @@ def _generate_feedback_core_once(essay):
         dimension = item["dimension"]
         if dimension not in counts:
             raise ValueError("Unknown feedback dimension")
-        counts[dimension] += 1
-        if counts[dimension] > {"Language": 3, "Content": 2, "Organization": 1}[dimension]:
-            raise ValueError(f"Too many suggestions for dimension: {dimension}")
         original = item["original"]
         if original not in essay or original in seen:
             raise ValueError("Missing or duplicate feedback evidence")
@@ -445,7 +451,7 @@ if "researcher_feedback_cache" not in st.session_state:
 st.title("Cogniva")
 st.caption("Language · Cognition · AI")
 st.header("Cogniva Write")
-st.caption("Version 1.2.2 · Structured Feedback Core · Secure Submission Storage")
+st.caption("Version 1.2.3 · Structured Feedback Core · Secure Submission Storage")
 test_mode = bool(st.session_state.get("researcher_test_mode", False) and st.session_state.get("admin_authenticated", False))
 if test_mode:
     st.warning("RESEARCHER TEST MODE — Responses will be marked as test data.")
@@ -651,7 +657,7 @@ elif st.session_state.stage == 3:
                 **st.session_state.initial_data,
                 "feedback_condition":
                     st.session_state.feedback_condition,
-                "feedback_type": "ai_generated_v1_2_2_test" if test_mode else "ai_generated_v1_2_2",
+                "feedback_type": "ai_generated_v1_2_3_test" if test_mode else "ai_generated_v1_2_3",
                 "feedback_text": st.session_state.feedback_text,
                 "feedback_word_count": len(
                     st.session_state.feedback_text.split()
