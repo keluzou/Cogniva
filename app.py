@@ -88,13 +88,21 @@ def generate_feedback_core(essay):
         "replacement must be correct in its original sentence context, and explanation "
         "must accurately name the grammatical rule. Use distinct, high-priority issues. "
         "Distinguish subject-verb agreement, modal + base verb, comparatives, articles, "
-        "and other categories precisely. No invented errors, no markdown."
+        "and other categories precisely. When an error follows can, should, must, "
+        "may, might, will, would, could, or shall, label it modal + base verb, "
+        "NOT subject-verb agreement. Praise ideas, examples, organization, or "
+        "argumentation rather than grammatical accuracy when the cited passage "
+        "contains an error. Prefer a grammatically correct quote when possible. "
+        "No invented errors, no markdown."
     )
     draft = openai_response(instructions, essay)
     reviewed = openai_response(
         "You are an independent EFL feedback reviewer. Compare the original essay "
         "and JSON draft. Correct mislabeled categories, invalid replacements, "
-        "overlapping points, and quotations not found verbatim in the essay. "
+         "overlapping points, and quotations not found verbatim in the essay. "
+        "Do not praise grammatical accuracy or correct word choice in a quote "
+        "that contains an error. A modal verb followed by an incorrect verb "
+        "form is a modal + base verb error, not subject-verb agreement. "
         "Return ONLY a valid JSON object with the SAME schema: strength_quote, "
         "strength_explanation, suggestions (exactly four objects with category, "
         "original, replacement, explanation). Do not include markdown.",
@@ -128,6 +136,28 @@ def generate_feedback_core(essay):
         if original in seen:
             raise ValueError("Duplicate correction")
         seen.add(original)
+        # Deterministic category guard for modal + verb errors.
+        # This does not certify that the proposed replacement is correct.
+        modal_pattern = re.compile(
+            r"\\b(can|could|should|would|will|shall|may|might|must)\\s+"
+            r"([A-Za-z]+)\\b", re.IGNORECASE
+        )
+        for match in modal_pattern.finditer(original):
+            modal = match.group(1)
+            source_verb = match.group(2)
+            corrected = re.search(
+                r"\\b" + re.escape(modal) + r"\\s+([A-Za-z]+)\\b",
+                item["replacement"], re.IGNORECASE
+            )
+            if (corrected and source_verb.lower() != corrected.group(1).lower()
+                    and source_verb.lower().endswith("s")
+                    and source_verb[:-1].lower() == corrected.group(1).lower()):
+                item["category"] = "modal + base verb"
+                item["explanation"] = (
+                    f"After the modal verb '{modal.lower()}', use the base form "
+                    f"'{corrected.group(1)}' rather than '{source_verb}'."
+                )
+                break
     return data
 
 
@@ -338,7 +368,7 @@ if "researcher_feedback_cache" not in st.session_state:
 st.title("Cogniva")
 st.caption("Language · Cognition · AI")
 st.header("Cogniva Write")
-st.caption("Version 0.9 · Structured Feedback Core · Secure Submission Storage")
+st.caption("Version 0.9.1 · Structured Feedback Core · Secure Submission Storage")
 test_mode = bool(st.session_state.get("researcher_test_mode", False) and st.session_state.get("admin_authenticated", False))
 if test_mode:
     st.warning("RESEARCHER TEST MODE — Responses will be marked as test data.")
@@ -541,7 +571,7 @@ elif st.session_state.stage == 3:
                 **st.session_state.initial_data,
                 "feedback_condition":
                     st.session_state.feedback_condition,
-                "feedback_type": "ai_generated_v0_9_test" if test_mode else "ai_generated_v0_9",
+                "feedback_type": "ai_generated_v0_9_1_test" if test_mode else "ai_generated_v0_9_1",
                 "feedback_text": st.session_state.feedback_text,
                 "feedback_word_count": len(
                     st.session_state.feedback_text.split()
