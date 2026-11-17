@@ -85,7 +85,9 @@ def _generate_feedback_core_once(essay):
         "form; Improvement means an acceptable passage with a specific, justified "
         "opportunity to improve it. Do not call optional style changes errors. "
         "Dimension must be exactly "
-        "Language, Content, or Organization. Use at most 3 Language, 2 Content, "
+        "Language, Content, or Organization. Identify up to 8 distinct Language candidates across the ENTIRE essay, "
+        "including later paragraphs and different error categories; the app "
+        "will select at most 3. Use at most 2 Content, 
         "and 1 Organization suggestions. Do not invent issues to fill quotas. "
         "Every original must be a verbatim, concise, nonempty substring of the essay. "
         "For Language, replacement must be a correct replacement for original in context. "
@@ -99,7 +101,10 @@ def _generate_feedback_core_once(essay):
         "just because it is short, especially for a 100-150 word essay. "
         "If a text is grammatically correct but weakly argued, give specific "
         "Content suggestions rather than inventing grammar mistakes. "
-        "Do not praise grammar in a quote containing grammatical errors. "
+        "Choose a strength_quote that is grammatically correct whenever "
+        "possible. If no such quote exists, explicitly praise the IDEA rather "
+        "than language correctness, and acknowledge that the wording needs "
+        "editing. Never describe an erroneous sentence as well written. "
         "Modal verbs take the base verb form. Return no markdown."
     )
     draft = openai_response(instructions, essay)
@@ -113,7 +118,11 @@ def _generate_feedback_core_once(essay):
          "and avoid generic requests to expand an adequate short conclusion. "
         "For Organization, describe the coherence problem and the desired "
         "relationship, not a mandatory technique such as combining sentences. "
-        "Keep at most 3 Language, 2 Content, and 1 Organization items. "
+         "Preserve up to 8 distinct Language candidates from throughout the essay; "
+        "the application selects at most 3 across paragraphs and categories. "
+        "Keep at most 2 Content and 1 Organization items. "
+        "Choose a grammatically correct strength_quote if possible; otherwise "
+        "praise only the idea and explicitly acknowledge language errors. "
         "Remove invented, redundant, vague, or unsupported items. For Content and "
         "Organization, replacement must be an actionable revision instruction, "
         "not a rewritten essay. Never force a quota.",
@@ -125,19 +134,51 @@ def _generate_feedback_core_once(essay):
         raise ValueError("Feedback is not valid JSON") from exc
     if not isinstance(data, dict) or not isinstance(data.get("suggestions"), list):
         raise ValueError("Invalid feedback structure")
-    # Keep the configured cap per dimension rather than rejecting a useful core.
+    # Select language targets from across the essay, not simply the first three.
+    # Selection is deterministic for the same reviewed feedback core.
     limits = {"Language": 3, "Content": 2, "Organization": 1}
+    paragraphs = [p for p in essay.split("\\n\\n") if p.strip()]
+    def paragraph_index(evidence):
+        position = essay.find(evidence)
+        if position < 0:
+            return len(paragraphs)
+        return essay[:position].count("\\n\\n")
+
+    candidates = data["suggestions"]
+    for item in candidates:
+        if not isinstance(item, dict) or item.get("dimension") not in limits:
+            raise ValueError("Invalid feedback dimension")
+    language = [item for item in candidates if item["dimension"] == "Language"]
+    # Round-robin by paragraph, preferring different categories where available.
+    buckets = {}
+    for item in language:
+        buckets.setdefault(paragraph_index(item.get("original", "")), []).append(item)
+    chosen_language = []
+    used_categories = set()
+    while len(chosen_language) < limits["Language"] and any(buckets.values()):
+        for paragraph in sorted(buckets):
+            if len(chosen_language) >= limits["Language"]:
+                break
+            pool = buckets[paragraph]
+            if not pool:
+                continue
+            index = next((i for i, candidate in enumerate(pool)
+                          if candidate.get("category", "").lower() not in used_categories), 0)
+            picked = pool.pop(index)
+            chosen_language.append(picked)
+            used_categories.add(picked.get("category", "").lower())
+    chosen_ids = {id(item) for item in chosen_language}
+    counts = {"Language": 0, "Content": 0, "Organization": 0}
     selected = []
-    counts = {name: 0 for name in limits}
-    for item in data["suggestions"]:
-        if not isinstance(item, dict):
-            raise ValueError("Invalid feedback item")
-        dimension = item.get("dimension")
-        if dimension not in limits:
-            raise ValueError("Unknown feedback dimension")
-        if counts[dimension] < limits[dimension]:
-            selected.append(item)
-            counts[dimension] += 1
+    for item in candidates:
+        dimension = item["dimension"]
+        if dimension == "Language":
+            if id(item) not in chosen_ids:
+                continue
+        elif counts[dimension] >= limits[dimension]:
+            continue
+        selected.append(item)
+        counts[dimension] += 1
     suggestions = selected
     data["suggestions"] = suggestions
     quote = data.get("strength_quote")
@@ -451,7 +492,7 @@ if "researcher_feedback_cache" not in st.session_state:
 st.title("Cogniva")
 st.caption("Language · Cognition · AI")
 st.header("Cogniva Write")
-st.caption("Version 1.2.3 · Structured Feedback Core · Secure Submission Storage")
+st.caption("Version 1.3 · Structured Feedback Core · Secure Submission Storage")
 test_mode = bool(st.session_state.get("researcher_test_mode", False) and st.session_state.get("admin_authenticated", False))
 if test_mode:
     st.warning("RESEARCHER TEST MODE — Responses will be marked as test data.")
@@ -657,7 +698,7 @@ elif st.session_state.stage == 3:
                 **st.session_state.initial_data,
                 "feedback_condition":
                     st.session_state.feedback_condition,
-                "feedback_type": "ai_generated_v1_2_3_test" if test_mode else "ai_generated_v1_2_3",
+                "feedback_type": "ai_generated_v1_3_test" if test_mode else "ai_generated_v1_3",
                 "feedback_text": st.session_state.feedback_text,
                 "feedback_word_count": len(
                     st.session_state.feedback_text.split()
