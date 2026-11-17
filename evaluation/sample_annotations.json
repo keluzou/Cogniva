@@ -173,5 +173,27 @@
         "gold_match": null
       }
     ]
+  },
+  {
+    "essay": "H",
+    "version": "v1.5.5",
+    "run_id": "H-observed-4",
+    "same_substantive_feedback": true,
+    "suggestions": [
+      {
+        "dimension": "Language",
+        "type": "Correction",
+        "validity": "invalid",
+        "false_correction": true,
+        "gold_match": null
+      },
+      {
+        "dimension": "Organization",
+        "type": "Improvement",
+        "validity": "valid",
+        "false_correction": false,
+        "gold_match": "H-O1"
+      }
+    ]
   }
 ]
