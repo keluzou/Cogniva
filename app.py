@@ -79,11 +79,15 @@ def _generate_feedback_core_once(essay):
         "You are an EFL writing tutor. Return ONLY JSON with keys strength_quote, "
         "strength_explanation, suggestions. strength_quote is an exact substring "
         "of the essay. Praise a genuine strength without exaggeration. "
-        "suggestions is an array of 0 to 6 objects, each with keys dimension, "
+         "suggestions is an array of 0 to 11 candidate objects, each with keys dimension, "
          "category, type, original, replacement, explanation. Type must be exactly "
         "Correction or Improvement. Correction means a demonstrably incorrect "
         "form; Improvement means an acceptable passage with a specific, justified "
-        "opportunity to improve it. Do not call optional style changes errors. "
+         "opportunity to improve it. A grammatical sentence is NEVER a Correction. "
+        "Do not treat hedging (may/can), stylistic confidence, or equivalent "
+        "prepositions as errors. If a Language Improvement is merely an "
+        "alternative phrasing with no concrete gain in clarity or precision, "
+        "omit it. Zero Language suggestions is acceptable. "
         "Dimension must be exactly "
         "Language, Content, or Organization. Identify up to 8 distinct Language candidates across the ENTIRE essay, "
         "including later paragraphs and different error categories; the app "
@@ -94,7 +98,13 @@ def _generate_feedback_core_once(essay):
         "For Content and Organization, replacement must be a specific, actionable "
         "revision instruction, NOT a fabricated quote or a full rewritten essay. "
         "Explain the specific issue and what successful revision would achieve. "
-         "Each suggestion must target one distinct issue and avoid overlap, even "
+          "Read the FULL essay before requesting supporting examples or details. "
+        "Do not request evidence already present elsewhere in the essay. "
+        "For 100-150 word essays, do not demand statistics for ordinary "
+        "background claims. Organization feedback must identify an actual "
+        "break in logic or misplaced idea; do not suggest adding a transition "
+        "when the logical connection is already clear. "
+        "Each suggestion must target one distinct issue and avoid overlap, even "
         "if two quotes differ. Do not give two suggestions that ask for the same "
         "examples or reasons. Organization suggestions must identify a genuine "
         "logical-order or cohesion issue; do not request a longer conclusion "
@@ -114,8 +124,13 @@ def _generate_feedback_core_once(essay):
     reviewed = openai_response(
         "Independently review this EFL essay and draft JSON. Return ONLY corrected "
         "JSON with EXACTLY the same schema: strength_quote, strength_explanation, "
-        "suggestions (array of 0 to 6 objects with dimension, category, original, "
+         "suggestions (array of 0 to 11 candidates with dimension, category, original, "
          "replacement, explanation, type). type is Correction or Improvement. "
+         "Act as a skeptical quality auditor: DELETE unnecessary changes even "
+        "if this leaves zero suggestions. Confirm each Language Correction "
+        "fixes an actual grammatical error, not merely a change in certainty, "
+        "style, or phrasing. Reject changes from correct may to can or "
+        "natural when preparing to on preparing without a specific error. "
         "Verify verbatim source quotes and correctness. Never treat an optional "
         "wording change as a Correction. Remove overlapping Content advice, "
          "and avoid generic requests to expand an adequate short conclusion. "
@@ -128,6 +143,9 @@ def _generate_feedback_core_once(essay):
         "a meaningful claim, nuanced stance, reasoning, or concrete example. "
         "Choose a grammatically correct strength_quote if possible; otherwise "
         "praise only the idea and explicitly acknowledge language errors. "
+         "Before suggesting Content evidence, search the entire essay for "
+        "existing examples or explanations. Before suggesting Organization "
+        "changes, verify there is an actual cohesion problem. "
         "Remove invented, redundant, vague, or unsupported items. For Content and "
         "Organization, replacement must be an actionable revision instruction, "
         "not a rewritten essay. Never force a quota.",
@@ -560,7 +578,7 @@ if "researcher_feedback_cache" not in st.session_state:
 st.title("Cogniva")
 st.caption("Language · Cognition · AI")
 st.header("Cogniva Write")
-st.caption("Version 1.4.1 · Structured Feedback Core · Secure Submission Storage")
+st.caption("Version 1.5 · Structured Feedback Core · Secure Submission Storage")
 test_mode = bool(st.session_state.get("researcher_test_mode", False) and st.session_state.get("admin_authenticated", False))
 if test_mode:
     st.warning("RESEARCHER TEST MODE — Responses will be marked as test data.")
@@ -766,7 +784,7 @@ elif st.session_state.stage == 3:
                 **st.session_state.initial_data,
                 "feedback_condition":
                     st.session_state.feedback_condition,
-                "feedback_type": "ai_generated_v1_4_1_test" if test_mode else "ai_generated_v1_4_1",
+                "feedback_type": "ai_generated_v1_5_test" if test_mode else "ai_generated_v1_5",
                 "feedback_text": st.session_state.feedback_text,
                 "feedback_word_count": len(
                     st.session_state.feedback_text.split()
