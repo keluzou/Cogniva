@@ -212,34 +212,39 @@ def style_feedback(core, condition):
     factual = format_feedback_core(core)
     if condition == "neutral":
         return factual
-    praise = openai_response(
-        "Write TWO short paragraphs of encouraging, expressive EFL feedback. "
-        "Return ONLY a JSON object with string fields 'opening' and 'closing'. "
-        "In opening, praise only the documented writing strength and quote the "
-        "provided exact evidence. In closing, encourage revision. Use 4-7 "
-        "friendly emojis total, mostly in opening, including expressive faces. "
-         "Do NOT include any correction suggestions, revision advice, writing "
-        "strategies, or new factual claims. The closing must be ONLY emotional "
-        "encouragement, without telling the learner what to add, change, "
-        "explain, clarify, expand, reorganize, or focus on. "
-        "Do NOT use markdown.",
-        json.dumps({
-            "strength_quote": core["strength_quote"],
-            "strength_explanation": core["strength_explanation"],
-        }, ensure_ascii=False),
+    import re
+    # Retry only the supportive wrapper; never regenerate the shared feedback core.
+    advice_pattern = re.compile(
+        r"\\b(consider|try to|you (?:could|should|might)|add|expand|explain|"
+        r"clarify|reorganize|include|provide|revise|focus on|work on|improve by)\\b",
+        re.I,
     )
-    try:
-        parts = json.loads(praise)
-        opening, closing = parts["opening"], parts["closing"]
-        if not all(isinstance(v, str) and v.strip() for v in (opening, closing)):
-            raise ValueError("Empty supportive wording")
-    except (ValueError, KeyError, TypeError):
-        raise ValueError("Invalid supportive wording")
-    # Reject additional advice in supportive-only wording before display.
-    # This is a conservative heuristic; researcher preview remains necessary.
-    advice_pattern = re.compile(r"\\b(consider|try to|you (?:could|should|might)|add|expand|explain|clarify|reorganize|include|provide|revise|focus on|work on|improve by)\\b", re.I)
-    if advice_pattern.search(opening) or advice_pattern.search(closing):
-        raise ValueError("Supportive wording contains additional revision advice")
+    last_error = None
+    for _ in range(3):
+        try:
+            praise = openai_response(
+                "Return ONLY a JSON object with two short string fields: opening "
+                "and closing. Opening should warmly celebrate ONLY the documented "
+                "writing strength using its exact quote. Closing should ONLY "
+                "express emotional encouragement (e.g., 'You've got this!'). "
+                "Use 4-7 friendly emojis across both fields. No additional "
+                "revision advice, instructions, or factual claims. No markdown.",
+                json.dumps({
+                    "strength_quote": core["strength_quote"],
+                    "strength_explanation": core["strength_explanation"],
+                }, ensure_ascii=False),
+            )
+            parts = json.loads(praise)
+            opening, closing = parts["opening"], parts["closing"]
+            if not all(isinstance(v, str) and v.strip() for v in (opening, closing)):
+                raise ValueError("Empty supportive wording")
+            if advice_pattern.search(opening) or advice_pattern.search(closing):
+                raise ValueError("Supportive wording contains additional revision advice")
+            break
+        except (ValueError, KeyError, TypeError) as exc:
+            last_error = exc
+    else:
+        raise ValueError("Supportive wording validation failed") from last_error
     corrections = factual.split("Revision suggestions:", 1)[1]
     return "Writing strength:\n" + opening + "\n\nRevision suggestions:" + corrections + "\n\n" + closing
 
@@ -438,7 +443,7 @@ if "researcher_feedback_cache" not in st.session_state:
 st.title("Cogniva")
 st.caption("Language · Cognition · AI")
 st.header("Cogniva Write")
-st.caption("Version 1.2 · Structured Feedback Core · Secure Submission Storage")
+st.caption("Version 1.2.1 · Structured Feedback Core · Secure Submission Storage")
 test_mode = bool(st.session_state.get("researcher_test_mode", False) and st.session_state.get("admin_authenticated", False))
 if test_mode:
     st.warning("RESEARCHER TEST MODE — Responses will be marked as test data.")
@@ -550,8 +555,10 @@ if st.session_state.stage == 1:
                         st.error(f"AI request failed (HTTP {exc.code}; code: {api_error_code}).")
                     except (URLError, TimeoutError):
                         st.error("AI request failed (network connection or timeout).")
-                    except (ValueError, KeyError, TypeError):
+                    except (ValueError, KeyError, TypeError) as exc:
                         st.error("AI response could not be processed. Please try again.")
+                        if test_mode:
+                            st.caption(f"Researcher diagnostic: {type(exc).__name__}: {exc}")
                     else:
                         st.session_state.stage = 2
                         st.rerun()
@@ -642,7 +649,7 @@ elif st.session_state.stage == 3:
                 **st.session_state.initial_data,
                 "feedback_condition":
                     st.session_state.feedback_condition,
-                "feedback_type": "ai_generated_v1_2_test" if test_mode else "ai_generated_v1_2",
+                "feedback_type": "ai_generated_v1_2_1_test" if test_mode else "ai_generated_v1_2_1",
                 "feedback_text": st.session_state.feedback_text,
                 "feedback_word_count": len(
                     st.session_state.feedback_text.split()
