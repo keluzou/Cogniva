@@ -15,6 +15,8 @@ jobs:
           python-version: '3.11'
       - name: Compile Python source
         run: python -m compileall -q app.py feedback_guard.py organization_audit.py evaluation
+      - name: Check regex integrity
+        run: python -m unittest -v test_regex_integrity.py
       - name: Test guard
         run: python -m unittest -v test_feedback_guard.py
       - name: Test organization audit
