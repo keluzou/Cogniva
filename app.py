@@ -74,21 +74,45 @@ def openai_response(instructions, text):
 
 
 def generate_feedback_core(essay):
-    """Generate one factual feedback core for the supplied essay."""
-    return openai_response(
+    """Draft and independently review a shared factual feedback core."""
+    draft = openai_response(
         "You are an EFL writing tutor. Read the student's English essay carefully. "
-        "Produce two sections in concise, neutral English. "
-        "Section A, 'Writing strength': identify exactly ONE specific, genuine "
-        "strength and quote a short phrase from the essay as evidence. "
-        "Describe what works without praise or encouragement. "
+        "Produce exactly two sections in concise, neutral English. "
+        "Section A, 'Writing strength': identify exactly ONE genuine strength "
+        "and quote a short phrase from the essay as evidence. "
         "Section B, 'Revision suggestions': provide exactly FOUR numbered, "
         "distinct and actionable suggestions based on real issues in the essay. "
-        "Avoid overlapping corrections or repeating the same issue. "
-        "Give accurate original-to-corrected examples where appropriate. "
-        "Do not invent errors, rewrite the entire essay, or assign a grade. "
-        "Avoid generic compliments. Keep the content clear and concise.",
+        "Each suggestion must use an accurate error category and an exact "
+        "original excerpt with a grammatically correct replacement. "
+        "Do not confuse subject-verb agreement with articles, plurals, or "
+        "prepositions. Avoid overlapping issues, invented errors, unsupported "
+        "claims, generic praise, and grading.",
         essay,
     )
+    reviewed = openai_response(
+        "You are an independent EFL feedback quality reviewer. "
+        "Check the draft feedback against the ORIGINAL ESSAY. "
+        "Correct any mislabeled grammar categories. Verify that every "
+        "quoted error actually appears in the original essay, and that "
+        "each proposed replacement is grammatically correct IN CONTEXT. "
+        "Do not suggest a replacement that breaks agreement with adjacent "
+        "words or changes the student's intended meaning. "
+        "Keep exactly ONE evidence-based writing strength and exactly FOUR "
+        "distinct numbered revision suggestions. If a point is wrong or "
+        "redundant, replace it with a genuine issue from the original essay. "
+        "Keep the two sections and a concise neutral style. "
+        "Return ONLY the corrected feedback, with no commentary. "
+        "Do not claim the feedback is error-free.",
+        "ORIGINAL ESSAY:\n" + essay + "\n\nDRAFT FEEDBACK:\n" + draft,
+    )
+    import re
+    numbered = re.findall(r"(?m)^\\s*[1-4]\\.\\s+", reviewed)
+    if len(numbered) != 4 or not all(
+        re.search(r"(?m)^\\s*" + str(i) + r"\\.\\s+", reviewed)
+        for i in range(1, 5)
+    ):
+        raise ValueError("Feedback review did not return four numbered suggestions")
+    return reviewed
 
 
 def style_feedback(core, condition):
@@ -281,7 +305,7 @@ if "researcher_feedback_cache" not in st.session_state:
 st.title("Cogniva")
 st.caption("Language · Cognition · AI")
 st.header("Cogniva Write")
-st.caption("Version 0.7 · Shared Feedback Core · Secure Submission Storage")
+st.caption("Version 0.8 · Reviewed Feedback Core · Secure Submission Storage")
 test_mode = bool(st.session_state.get("researcher_test_mode", False) and st.session_state.get("admin_authenticated", False))
 if test_mode:
     st.warning("RESEARCHER TEST MODE — Responses will be marked as test data.")
@@ -484,7 +508,7 @@ elif st.session_state.stage == 3:
                 **st.session_state.initial_data,
                 "feedback_condition":
                     st.session_state.feedback_condition,
-                "feedback_type": "ai_generated_v0_7_test" if test_mode else "ai_generated_v0_7",
+                "feedback_type": "ai_generated_v0_8_test" if test_mode else "ai_generated_v0_8",
                 "feedback_text": st.session_state.feedback_text,
                 "feedback_word_count": len(
                     st.session_state.feedback_text.split()
