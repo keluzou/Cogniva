@@ -302,8 +302,21 @@ if st.session_state.stage == 1:
                         st.session_state.feedback_text = generate_writing_feedback(
                             initial_essay, condition
                         )
-                    except (HTTPError, URLError, TimeoutError, ValueError, KeyError, json.JSONDecodeError):
-                        st.error("AI feedback is temporarily unavailable. Please try again.")
+                    except HTTPError as exc:
+                        # Only show status and allowlisted error code; never expose credentials.
+                        api_error_code = "unknown"
+                        try:
+                            error_payload = json.loads(exc.read().decode("utf-8"))
+                            candidate = error_payload.get("error", {}).get("code")
+                            if isinstance(candidate, str) and len(candidate) <= 48 and all(c.isalnum() or c == "_" for c in candidate):
+                                api_error_code = candidate
+                        except (ValueError, UnicodeError, AttributeError, TypeError):
+                            pass
+                        st.error(f"AI request failed (HTTP {exc.code}; code: {api_error_code}).")
+                    except (URLError, TimeoutError):
+                        st.error("AI request failed (network connection or timeout).")
+                    except (ValueError, KeyError, TypeError):
+                        st.error("AI response could not be processed. Please try again.")
                     else:
                         st.session_state.stage = 2
                         st.rerun()
