@@ -110,10 +110,11 @@ def _generate_feedback_core_once(essay):
         "examples or reasons. Organization suggestions must identify a genuine "
         "logical-order or cohesion issue; do not request a longer conclusion "
         "just because it is short, especially for a 100-150 word essay. "
+        "When the essay raises an opposing view, check whether it explains the objection and responds to it with reasons. If it merely says advantages outweigh disadvantages, consider a distinct Content development suggestion, without duplicating other advice. "
         "If a text is grammatically correct but weakly argued, give specific "
         "Content suggestions rather than inventing grammar mistakes. "
-        "Select a meaningful writing strength showing a balanced position, "
-        "specific support, reasoning, or effective structure. Avoid trivial "
+        "Select a meaningful writing strength showing a genuinely balanced position, "
+        "specific support, reasoning, or effective structure. Only describe a quote as balanced if it itself acknowledges a limitation or contrasting viewpoint. Two positive claims are not balanced. Avoid trivial "
         "generic claims such as AI is convenient. "
         "Choose a strength_quote that is grammatically correct whenever "
         "possible. If no such quote exists, explicitly praise the IDEA rather "
@@ -144,6 +145,7 @@ def _generate_feedback_core_once(essay):
         "a meaningful claim, nuanced stance, reasoning, or concrete example. "
         "Choose a grammatically correct strength_quote if possible; otherwise "
         "praise only the idea and explicitly acknowledge language errors. "
+         "Check counterargument development separately from examples of benefits; retain a specific suggestion when a stated objection is not explained or answered. Never describe two positive claims as a balanced view. "
          "Before suggesting Content evidence, search the entire essay for "
         "existing examples or explanations. Before suggesting Organization "
         "changes, verify there is an actual cohesion problem. "
@@ -269,6 +271,21 @@ def _generate_feedback_core_once(essay):
         counts[dimension] += 1
     suggestions = selected
     data["suggestions"] = suggestions
+    # Guard against an unsupported claim of balance in the strength quote.
+    import re
+    strength_quote = str(data.get("strength_quote", ""))
+    strength_explanation = str(data.get("strength_explanation", ""))
+    has_contrast = bool(re.search(
+        r"\b(but|however|although|though|while|whereas|despite|yet|unless)\b",
+        strength_quote, re.I
+    ))
+    if not has_contrast and re.search(
+        r"\b(balanced|both sides|two sides|dual perspective)\b",
+        strength_explanation, re.I
+    ):
+        data["strength_explanation"] = (
+            "This passage identifies a relevant point about AI in education."
+        )
     quote = data.get("strength_quote")
     explanation = data.get("strength_explanation")
     if not isinstance(quote, str) or not quote.strip() or quote not in essay:
@@ -580,7 +597,7 @@ if "researcher_feedback_cache" not in st.session_state:
 st.title("Cogniva")
 st.caption("Language · Cognition · AI")
 st.header("Cogniva Write")
-st.caption("Version 1.5.2 · Structured Feedback Core · Secure Submission Storage")
+st.caption("Version 1.5.3 · Structured Feedback Core · Secure Submission Storage")
 test_mode = bool(st.session_state.get("researcher_test_mode", False) and st.session_state.get("admin_authenticated", False))
 if test_mode:
     st.warning("RESEARCHER TEST MODE — Responses will be marked as test data.")
@@ -790,7 +807,7 @@ elif st.session_state.stage == 3:
                 **st.session_state.initial_data,
                 "feedback_condition":
                     st.session_state.feedback_condition,
-                "feedback_type": "ai_generated_v1_5_2_test" if test_mode else "ai_generated_v1_5_2",
+                "feedback_type": "ai_generated_v1_5_3_test" if test_mode else "ai_generated_v1_5_3",
                 "feedback_text": st.session_state.feedback_text,
                 "feedback_word_count": len(
                     st.session_state.feedback_text.split()
