@@ -15,6 +15,12 @@ def is_known_false_correction(original, replacement):
     # Complementizer 'that' is optional in ordinary finite complements.
     if _BELIEVE_THAT.sub(lambda m: m.group(1), replacement).casefold() == original.casefold():
         return True
+    # Appending a contextual prepositional phrase to an already complete
+    # sentence does not by itself correct a grammatical error.
+    if replacement.casefold().startswith(original.rstrip(".!?").casefold() + " "):
+        suffix = replacement[len(original.rstrip(".!?")):].strip().rstrip(".!?")
+        if re.match(r"^(among|for|in|at|with|to)\\s+\\w+", suffix, re.I):
+            return True
     # Changing certainty is not a grammatical repair.
     for source, target in (("are", "can be"), ("is", "can be"), ("may", "can")):
         changed = re.sub(r"\b" + source + r"\b", target, original, count=1, flags=re.I)
