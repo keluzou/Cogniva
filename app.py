@@ -34,6 +34,69 @@ def db_request(method, path, payload=None):
         return json.loads(body) if body else []
 
 
+
+def openai_response(instructions, text):
+    """Generate text server-side using the Responses API."""
+    api_key = str(st.secrets["OPENAI_API_KEY"]).strip()
+    if not api_key:
+        raise ValueError("Missing API key")
+    payload = {
+        "model": "gpt-5-mini",
+        "instructions": instructions,
+        "input": text,
+        "max_output_tokens": 1400,
+    }
+    req = Request(
+        "https://api.openai.com/v1/responses",
+        data=json.dumps(payload).encode("utf-8"),
+        headers={
+            "Authorization": "Bearer " + api_key,
+            "Content-Type": "application/json",
+        },
+        method="POST",
+    )
+    with urlopen(req, timeout=90) as response:
+        result = json.loads(response.read())
+    if result.get("status") != "completed":
+        raise ValueError("AI response incomplete")
+    parts = [
+        part.get("text", "")
+        for item in result.get("output", [])
+        if item.get("type") == "message"
+        for part in item.get("content", [])
+        if part.get("type") == "output_text"
+    ]
+    answer = "\\n".join(parts).strip()
+    if not answer:
+        raise ValueError("Empty AI response")
+    return answer
+
+
+def generate_writing_feedback(essay, condition):
+    """Use one content analysis for both styles; do not disclose model prompts."""
+    core = openai_response(
+        "You are an EFL writing tutor. Examine the student's English essay on "
+        "university students using AI. Provide exactly 3-5 specific, actionable "
+        "revision points grounded in the submitted essay. Focus on genuine "
+        "grammar, vocabulary, coherence or argument issues. Quote only short "
+        "relevant phrases from the essay when useful. Do not invent mistakes. "
+        "Do not rewrite the whole essay, grade it, or mention the student's "
+        "ability. Use concise neutral English. Number each point.",
+        essay,
+    )
+    if condition == "neutral":
+        return core
+    return openai_response(
+        "Rewrite the following EFL writing feedback in a supportive, "
+        "encouraging tone. Preserve EVERY numbered revision point, factual "
+        "claim, example, correction and suggestion exactly in substance. "
+        "Do not add or remove advice, corrections, praise of writing quality, "
+        "or new examples. Use brief encouragement only as framing. "
+        "Keep the same numbered structure and similar length.",
+        core,
+    )
+
+
 def admin_panel():
     st.subheader("Researcher Dashboard")
     if not all(k in st.secrets for k in ("SUPABASE_URL", "SUPABASE_KEY", "ADMIN_PASSWORD")):
@@ -174,7 +237,7 @@ if "feedback_text" not in st.session_state:
 st.title("Cogniva")
 st.caption("Language · Cognition · AI")
 st.header("Cogniva Write")
-st.caption("Version 0.5 · Two Feedback Conditions · Secure Submission Storage")
+st.caption("Version 0.6 · AI Writing Feedback · Secure Submission Storage")
 st.divider()
 
 if st.session_state.stage == 1:
@@ -231,13 +294,19 @@ if st.session_state.stage == 1:
             condition = random.choice(["supportive", "neutral"])
             st.session_state.feedback_condition = condition
 
-            if condition == "supportive":
-                st.session_state.feedback_text = SUPPORTIVE_FEEDBACK
+            if "OPENAI_API_KEY" not in st.secrets:
+                st.error("AI feedback is not configured. Please contact the researcher.")
             else:
-                st.session_state.feedback_text = NEUTRAL_FEEDBACK
-
-            st.session_state.stage = 2
-            st.rerun()
+                with st.spinner("Generating writing feedback..."):
+                    try:
+                        st.session_state.feedback_text = generate_writing_feedback(
+                            initial_essay, condition
+                        )
+                    except (HTTPError, URLError, TimeoutError, ValueError, KeyError, json.JSONDecodeError):
+                        st.error("AI feedback is temporarily unavailable. Please try again.")
+                    else:
+                        st.session_state.stage = 2
+                        st.rerun()
 
 elif st.session_state.stage == 2:
     st.subheader("Step 2: Writing Feedback")
@@ -303,7 +372,7 @@ elif st.session_state.stage == 3:
                 **st.session_state.initial_data,
                 "feedback_condition":
                     st.session_state.feedback_condition,
-                "feedback_type": "predefined_prototype",
+                "feedback_type": "ai_generated_v0_6",
                 "feedback_text": st.session_state.feedback_text,
                 "feedback_word_count": len(
                     st.session_state.feedback_text.split()
