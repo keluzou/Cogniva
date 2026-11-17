@@ -9,6 +9,11 @@ class GuardTests(unittest.TestCase):
             "I believe students should be allowed",
             "I believe that students should be allowed"))
 
+    def test_optional_context_not_grammar(self):
+        self.assertTrue(is_known_false_correction(
+            "Teachers should encourage independent thinking.",
+            "Teachers should encourage independent thinking among students."))
+
     def test_real_modal_error_kept(self):
         self.assertFalse(is_known_false_correction(
             "universities should allows", "universities should allow"))
