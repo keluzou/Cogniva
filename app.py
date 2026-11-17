@@ -578,7 +578,7 @@ if "researcher_feedback_cache" not in st.session_state:
 st.title("Cogniva")
 st.caption("Language · Cognition · AI")
 st.header("Cogniva Write")
-st.caption("Version 1.5 · Structured Feedback Core · Secure Submission Storage")
+st.caption("Version 1.5.1 · Structured Feedback Core · Secure Submission Storage")
 test_mode = bool(st.session_state.get("researcher_test_mode", False) and st.session_state.get("admin_authenticated", False))
 if test_mode:
     st.warning("RESEARCHER TEST MODE — Responses will be marked as test data.")
@@ -608,10 +608,14 @@ if st.session_state.stage == 1:
     st.subheader("Step 1: Initial Writing")
 
     with st.form("initial_form"):
-        participant_id = st.text_input(
-            "Participant ID",
-            placeholder="e.g., TEST003"
-        )
+        if test_mode:
+            participant_id = "AUTO_" + uuid.uuid4().hex[:10].upper()
+            st.caption("Researcher test: Participant ID is generated automatically.")
+        else:
+            participant_id = st.text_input(
+                "Participant ID",
+                placeholder="e.g., P003"
+            )
 
         st.info(f"Topic: {TOPIC}")
 
@@ -639,7 +643,7 @@ if st.session_state.stage == 1:
     if continue_button:
         word_count = len(initial_essay.split())
 
-        if not participant_id.strip():
+        if not test_mode and not participant_id.strip():
             st.warning("Please enter a Participant ID.")
         elif any("\\u4e00" <= c <= "\\u9fff" for c in initial_essay):
             st.warning("This task requires an English essay. Please write in English.")
@@ -784,7 +788,7 @@ elif st.session_state.stage == 3:
                 **st.session_state.initial_data,
                 "feedback_condition":
                     st.session_state.feedback_condition,
-                "feedback_type": "ai_generated_v1_5_test" if test_mode else "ai_generated_v1_5",
+                "feedback_type": "ai_generated_v1_5_1_test" if test_mode else "ai_generated_v1_5_1",
                 "feedback_text": st.session_state.feedback_text,
                 "feedback_word_count": len(
                     st.session_state.feedback_text.split()
