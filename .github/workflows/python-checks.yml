@@ -14,9 +14,11 @@ jobs:
         with:
           python-version: '3.11'
       - name: Compile Python source
-        run: python -m compileall -q app.py feedback_guard.py evaluation
+        run: python -m compileall -q app.py feedback_guard.py organization_audit.py evaluation
       - name: Test guard
         run: python -m unittest -v test_feedback_guard.py
+      - name: Test organization audit
+        run: python -m unittest -v test_organization_audit.py
       - name: Test evaluation
         run: cd evaluation && python -m unittest -v test_evaluate.py
       - name: Evaluate labeled pilot
