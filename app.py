@@ -341,9 +341,9 @@ def _generate_feedback_core_once(essay):
         if dimension == "Language":
             if original == item["replacement"]:
                 raise ValueError("Unchanged language correction")
-            pattern = re.compile(r"\\b(can|could|should|would|will|shall|may|might|must)\\s+([A-Za-z]+)\\b", re.I)
+            pattern = re.compile(r"\b(can|could|should|would|will|shall|may|might|must)\s+([A-Za-z]+)\b", re.I)
             for match in pattern.finditer(original):
-                corrected = re.search(r"\\b" + re.escape(match.group(1)) + r"\\s+([A-Za-z]+)\\b", item["replacement"], re.I)
+                corrected = re.search(r"\b" + re.escape(match.group(1)) + r"\s+([A-Za-z]+)\b", item["replacement"], re.I)
                 source_verb = match.group(2)
                 if (corrected and source_verb.lower().endswith("s")
                         and source_verb[:-1].lower() == corrected.group(1).lower()):
@@ -398,8 +398,8 @@ def style_feedback(core, condition):
     import re
     # Retry only the supportive wrapper; never regenerate the shared feedback core.
     advice_pattern = re.compile(
-        r"\\b(consider|try to|you (?:could|should|might)|add|expand|explain|"
-        r"clarify|reorganize|include|provide|revise|focus on|work on|improve by)\\b",
+        r"\b(consider|try to|you (?:could|should|might)|add|expand|explain|"
+        r"clarify|reorganize|include|provide|revise|focus on|work on|improve by)\b",
         re.I,
     )
     last_error = None
