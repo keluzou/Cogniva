@@ -182,6 +182,11 @@ def _generate_feedback_core_once(essay):
                             and item.get("type") == "Correction"
                             and isinstance(item.get("original"), str)
                             and item["original"] in essay
+                            and all(isinstance(item.get(field), str)
+                                    and item[field].strip()
+                                    for field in ("category", "original",
+                                                  "replacement", "explanation"))
+                            and item["original"] != item["replacement"]
                             and item["original"] not in existing_quotes):
                         data["suggestions"].append(item)
                         existing_quotes.add(item["original"])
@@ -197,10 +202,20 @@ def _generate_feedback_core_once(essay):
             return len(paragraphs)
         return essay[:position].count("\n\n")
 
-    candidates = data["suggestions"]
-    for item in candidates:
-        if not isinstance(item, dict) or item.get("dimension") not in limits:
-            raise ValueError("Invalid feedback dimension")
+    # Incomplete optional AI suggestions must not abort a valid essay.
+    # Discard them before selection, preserving the strict checks below.
+    required = ("dimension", "category", "type", "original",
+                "replacement", "explanation")
+    candidates = [
+        item for item in data["suggestions"]
+        if isinstance(item, dict)
+        and item.get("dimension") in limits
+        and item.get("type") in ("Correction", "Improvement")
+        and all(isinstance(item.get(field), str) and item[field].strip()
+                for field in required)
+        and item["original"] in essay
+        and item["original"] != item["replacement"]
+    ]
     language = [item for item in candidates if item["dimension"] == "Language"]
     # Round-robin by paragraph, preferring different categories where available.
     buckets = {}
@@ -545,7 +560,7 @@ if "researcher_feedback_cache" not in st.session_state:
 st.title("Cogniva")
 st.caption("Language · Cognition · AI")
 st.header("Cogniva Write")
-st.caption("Version 1.4 · Structured Feedback Core · Secure Submission Storage")
+st.caption("Version 1.4.1 · Structured Feedback Core · Secure Submission Storage")
 test_mode = bool(st.session_state.get("researcher_test_mode", False) and st.session_state.get("admin_authenticated", False))
 if test_mode:
     st.warning("RESEARCHER TEST MODE — Responses will be marked as test data.")
@@ -751,7 +766,7 @@ elif st.session_state.stage == 3:
                 **st.session_state.initial_data,
                 "feedback_condition":
                     st.session_state.feedback_condition,
-                "feedback_type": "ai_generated_v1_4_test" if test_mode else "ai_generated_v1_4",
+                "feedback_type": "ai_generated_v1_4_1_test" if test_mode else "ai_generated_v1_4_1",
                 "feedback_text": st.session_state.feedback_text,
                 "feedback_word_count": len(
                     st.session_state.feedback_text.split()
