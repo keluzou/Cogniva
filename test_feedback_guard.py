@@ -1,0 +1,39 @@
+"""Regression checks for the deterministic false-correction guard."""
+import unittest
+from feedback_guard import is_known_false_correction, filter_known_false_corrections
+
+
+class GuardTests(unittest.TestCase):
+    def test_optional_that(self):
+        self.assertTrue(is_known_false_correction(
+            "I believe students should be allowed",
+            "I believe that students should be allowed"))
+
+    def test_real_modal_error_kept(self):
+        self.assertFalse(is_known_false_correction(
+            "universities should allows", "universities should allow"))
+
+    def test_real_agreement_error_kept(self):
+        self.assertFalse(is_known_false_correction(
+            "AI tools becomes", "AI tools become"))
+
+    def test_hedging_not_grammar(self):
+        self.assertTrue(is_known_false_correction(
+            "because they are useful", "because they can be useful"))
+
+    def test_only_corrections_filtered(self):
+        items = [
+            {"dimension": "Language", "type": "Correction",
+             "original": "I believe students learn",
+             "replacement": "I believe that students learn"},
+            {"dimension": "Language", "type": "Improvement",
+             "original": "I believe students learn",
+             "replacement": "I believe that students learn"},
+        ]
+        kept = filter_known_false_corrections(items)
+        self.assertEqual(len(kept), 1)
+        self.assertEqual(kept[0]["type"], "Improvement")
+
+
+if __name__ == "__main__":
+    unittest.main()
