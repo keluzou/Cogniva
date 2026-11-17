@@ -11,6 +11,7 @@ from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 
 import streamlit as st
+from feedback_guard import filter_known_false_corrections
 
 st.set_page_config(page_title="Cogniva Write", page_icon="📝")
 
@@ -234,6 +235,7 @@ def _generate_feedback_core_once(essay):
         and item["original"] in essay
         and item["original"] != item["replacement"]
     ]
+    candidates = filter_known_false_corrections(candidates)
     language = [item for item in candidates if item["dimension"] == "Language"]
     # Round-robin by paragraph, preferring different categories where available.
     buckets = {}
