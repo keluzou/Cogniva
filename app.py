@@ -87,7 +87,7 @@ def _generate_feedback_core_once(essay):
         "Dimension must be exactly "
         "Language, Content, or Organization. Identify up to 8 distinct Language candidates across the ENTIRE essay, "
         "including later paragraphs and different error categories; the app "
-        "will select at most 3. Use at most 2 Content, 
+        "will select at most 3. Use at most 2 Content, "
         "and 1 Organization suggestions. Do not invent issues to fill quotas. "
         "Every original must be a verbatim, concise, nonempty substring of the essay. "
         "For Language, replacement must be a correct replacement for original in context. "
@@ -492,7 +492,7 @@ if "researcher_feedback_cache" not in st.session_state:
 st.title("Cogniva")
 st.caption("Language · Cognition · AI")
 st.header("Cogniva Write")
-st.caption("Version 1.3 · Structured Feedback Core · Secure Submission Storage")
+st.caption("Version 1.3.1 · Structured Feedback Core · Secure Submission Storage")
 test_mode = bool(st.session_state.get("researcher_test_mode", False) and st.session_state.get("admin_authenticated", False))
 if test_mode:
     st.warning("RESEARCHER TEST MODE — Responses will be marked as test data.")
