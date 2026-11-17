@@ -82,11 +82,11 @@ def generate_feedback_core(essay):
         "object with keys 'strength_quote', 'strength_explanation', and 'suggestions'. "
         "The strength_quote must be an exact short substring of the essay and the "
         "explanation must identify one genuine writing strength without exaggeration. "
-        "suggestions must be an array of exactly four objects, each with keys "
+        "suggestions must be an array of zero to four objects, each with keys "
         "'category', 'original', 'replacement', 'explanation'. "
         "For each correction, original MUST be a verbatim substring of the essay, "
         "replacement must be correct in its original sentence context, and explanation "
-        "must accurately name the grammatical rule. Use distinct, high-priority issues. "
+        "must accurately name the grammatical rule. Use only genuine, distinct, high-priority errors. If the essay has no clear errors, return an empty suggestions array. Never invent corrections to reach a quota. "
         "Distinguish subject-verb agreement, modal + base verb, comparatives, articles, "
         "and other categories precisely. When an error follows can, should, must, "
         "may, might, will, would, could, or shall, label it modal + base verb, "
@@ -104,7 +104,7 @@ def generate_feedback_core(essay):
         "that contains an error. A modal verb followed by an incorrect verb "
         "form is a modal + base verb error, not subject-verb agreement. "
         "Return ONLY a valid JSON object with the SAME schema: strength_quote, "
-        "strength_explanation, suggestions (exactly four objects with category, "
+        "strength_explanation, suggestions (zero to four objects with category, "
         "original, replacement, explanation). Do not include markdown.",
         "ORIGINAL ESSAY:\n" + essay + "\n\nDRAFT JSON:\n" + draft,
     )
@@ -115,8 +115,8 @@ def generate_feedback_core(essay):
     if not isinstance(data, dict) or not isinstance(data.get("suggestions"), list):
         raise ValueError("Invalid feedback structure")
     suggestions = data["suggestions"]
-    if len(suggestions) != 4:
-        raise ValueError("Expected exactly four suggestions")
+    if len(suggestions) > 4:
+        raise ValueError("Expected at most four suggestions")
     quote = data.get("strength_quote")
     explanation = data.get("strength_explanation")
     if not isinstance(quote, str) or not quote.strip() or quote not in essay:
@@ -170,6 +170,8 @@ def format_feedback_core(data):
         "Revision suggestions:",
         "",
     ]
+    if not data["suggestions"]:
+        lines.append("No clear language errors identified. Review the essay for clarity and organization.")
     for i, item in enumerate(data["suggestions"], 1):
         lines.append(
             f'{i}. {item["category"]}: Replace "{item["original"]}" '
@@ -179,7 +181,7 @@ def format_feedback_core(data):
 
 
 def style_feedback(core, condition):
-    """Only praise/closing vary; the four corrections are rendered identically."""
+    """Only praise/closing vary; all corrections are rendered identically."""
     factual = format_feedback_core(core)
     if condition == "neutral":
         return factual
@@ -510,7 +512,7 @@ elif st.session_state.stage == 2:
                 if "supportive" in cached:
                     st.markdown("**Supportive feedback**")
                     st.info(cached["supportive"])
-                st.caption("Researcher preview only. Verify that all four correction points match before formal use.")
+                st.caption("Researcher preview only. Verify that the correction points match before formal use.")
 
     st.caption(
         "Please read the feedback carefully before revising."
