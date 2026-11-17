@@ -12,6 +12,7 @@ from urllib.request import Request, urlopen
 
 import streamlit as st
 from feedback_guard import filter_known_false_corrections
+from organization_audit import organization_audit_prompt, validate_organization_issue
 
 st.set_page_config(page_title="Cogniva Write", page_icon="📝")
 
@@ -245,6 +246,27 @@ def _generate_feedback_core_once(essay):
         and item["original"] != item["replacement"]
     ]
     candidates = filter_known_false_corrections(candidates)
+    # Independent paragraph-level pass: do not confuse missing content
+    # examples with a genuinely misplaced sentence. If it fails, retain
+    # the existing feedback rather than interrupting the participant.
+    if len(paragraphs) > 1:
+        try:
+            org_raw = openai_response(organization_audit_prompt(), essay)
+            org_issue = validate_organization_issue(
+                essay, json.loads(org_raw).get("issue")
+            )
+            if org_issue:
+                # Replace an existing Organization candidate only when the
+                # dedicated auditor identifies a distinct, grounded issue.
+                # Do not let the same evidence be advised twice.
+                others = [
+                    item for item in candidates
+                    if item["dimension"] != "Organization"
+                    and item["original"] != org_issue["original"]
+                ]
+                candidates = others + [org_issue]
+        except (ValueError, TypeError, AttributeError):
+            pass
     language = [item for item in candidates if item["dimension"] == "Language"]
     # Round-robin by paragraph, preferring different categories where available.
     buckets = {}
@@ -604,7 +626,7 @@ if "researcher_feedback_cache" not in st.session_state:
 st.title("Cogniva")
 st.caption("Language · Cognition · AI")
 st.header("Cogniva Write")
-st.caption("Version 1.5.4 · Structured Feedback Core · Secure Submission Storage")
+st.caption("Version 1.5.5 · Structured Feedback Core · Secure Submission Storage")
 test_mode = bool(st.session_state.get("researcher_test_mode", False) and st.session_state.get("admin_authenticated", False))
 if test_mode:
     st.warning("RESEARCHER TEST MODE — Responses will be marked as test data.")
@@ -814,7 +836,7 @@ elif st.session_state.stage == 3:
                 **st.session_state.initial_data,
                 "feedback_condition":
                     st.session_state.feedback_condition,
-                "feedback_type": "ai_generated_v1_5_4_test" if test_mode else "ai_generated_v1_5_4",
+                "feedback_type": "ai_generated_v1_5_5_test" if test_mode else "ai_generated_v1_5_5",
                 "feedback_text": st.session_state.feedback_text,
                 "feedback_word_count": len(
                     st.session_state.feedback_text.split()
