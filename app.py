@@ -41,10 +41,10 @@ def openai_response(instructions, text):
     if not api_key:
         raise ValueError("Missing API key")
     payload = {
-        "model": "gpt-5-mini",
+        "model": "gpt-4.1-mini",
         "instructions": instructions,
         "input": text,
-        "max_output_tokens": 1400,
+        "max_output_tokens": 1600,
     }
     req = Request(
         "https://api.openai.com/v1/responses",
