@@ -117,7 +117,7 @@ def _generate_feedback_core_once(essay):
         "Remove invented, redundant, vague, or unsupported items. For Content and "
         "Organization, replacement must be an actionable revision instruction, "
         "not a rewritten essay. Never force a quota.",
-        "ORIGINAL ESSAY:\\n" + essay + "\\n\\nDRAFT JSON:\\n" + draft,
+        "ORIGINAL ESSAY:\n" + essay + "\n\nDRAFT JSON:\n" + draft,
     )
     try:
         data = json.loads(reviewed)
@@ -127,7 +127,9 @@ def _generate_feedback_core_once(essay):
         raise ValueError("Invalid feedback structure")
     suggestions = data["suggestions"]
     if len(suggestions) > 6:
-        raise ValueError("Too many feedback suggestions")
+        # Keep the highest-priority six rather than fail the entire response.
+        suggestions = suggestions[:6]
+        data["suggestions"] = suggestions
     quote = data.get("strength_quote")
     explanation = data.get("strength_explanation")
     if not isinstance(quote, str) or not quote.strip() or quote not in essay:
@@ -150,7 +152,7 @@ def _generate_feedback_core_once(essay):
             raise ValueError("Unknown feedback dimension")
         counts[dimension] += 1
         if counts[dimension] > {"Language": 3, "Content": 2, "Organization": 1}[dimension]:
-            raise ValueError("Too many suggestions for dimension")
+            raise ValueError(f"Too many suggestions for dimension: {dimension}")
         original = item["original"]
         if original not in essay or original in seen:
             raise ValueError("Missing or duplicate feedback evidence")
@@ -181,7 +183,7 @@ def generate_feedback_core(essay):
             return _generate_feedback_core_once(essay)
         except (ValueError, KeyError, TypeError) as exc:
             last_error = exc
-    raise ValueError("Feedback validation failed after two attempts") from last_error
+    raise ValueError(f"Feedback validation failed after two attempts: {last_error}") from last_error
 
 
 def format_feedback_core(data):
@@ -443,7 +445,7 @@ if "researcher_feedback_cache" not in st.session_state:
 st.title("Cogniva")
 st.caption("Language · Cognition · AI")
 st.header("Cogniva Write")
-st.caption("Version 1.2.1 · Structured Feedback Core · Secure Submission Storage")
+st.caption("Version 1.2.2 · Structured Feedback Core · Secure Submission Storage")
 test_mode = bool(st.session_state.get("researcher_test_mode", False) and st.session_state.get("admin_authenticated", False))
 if test_mode:
     st.warning("RESEARCHER TEST MODE — Responses will be marked as test data.")
@@ -649,7 +651,7 @@ elif st.session_state.stage == 3:
                 **st.session_state.initial_data,
                 "feedback_condition":
                     st.session_state.feedback_condition,
-                "feedback_type": "ai_generated_v1_2_1_test" if test_mode else "ai_generated_v1_2_1",
+                "feedback_type": "ai_generated_v1_2_2_test" if test_mode else "ai_generated_v1_2_2",
                 "feedback_text": st.session_state.feedback_text,
                 "feedback_word_count": len(
                     st.session_state.feedback_text.split()
