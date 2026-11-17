@@ -19,7 +19,7 @@ def is_known_false_correction(original, replacement):
     # sentence does not by itself correct a grammatical error.
     if replacement.casefold().startswith(original.rstrip(".!?").casefold() + " "):
         suffix = replacement[len(original.rstrip(".!?")):].strip().rstrip(".!?")
-        if re.match(r"^(among|for|in|at|with|to)\\s+\\w+", suffix, re.I):
+        if re.match(r"^(among|for|in|at|with|to)\s+\w+", suffix, re.I):
             return True
     # Changing certainty is not a grammatical repair.
     for source, target in (("are", "can be"), ("is", "can be"), ("may", "can")):
