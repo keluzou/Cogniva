@@ -23,6 +23,16 @@ class GuardTests(unittest.TestCase):
         self.assertFalse(is_known_false_correction(
             "AI have disadvantages.", "AI has disadvantages."))
 
+    def test_repeated_how_to_is_optional(self):
+        self.assertTrue(is_known_false_correction(
+            "Teachers should therefore show students how to verify information and explain why an answer is trustworthy.",
+            "Teachers should therefore show students how to verify information and how to explain why an answer is trustworthy."))
+
+    def test_real_parallel_error_not_suppressed(self):
+        self.assertFalse(is_known_false_correction(
+            "Students should checking sources and explain their reasoning.",
+            "Students should check sources and explain their reasoning."))
+
     def test_real_modal_error_kept(self):
         self.assertFalse(is_known_false_correction(
             "universities should allows", "universities should allow"))
