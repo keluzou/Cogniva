@@ -29,6 +29,29 @@ class EvaluationTests(unittest.TestCase):
         self.assertEqual(result["false_corrections"], 1)
         self.assertEqual(result["priority_recall"]["Content"]["fraction"], 0.5)
 
+    def test_heldout_organization_target(self):
+        result = evaluate([{
+            "essay": "I", "version": "test", "run_id": "heldout-i",
+            "suggestions": [
+                {"dimension": "Organization", "type": "Improvement",
+                 "validity": "valid", "false_correction": False,
+                 "gold_match": "I-O1"}
+            ]
+        }])[0]
+        self.assertEqual(result["priority_recall"]["Organization"]["fraction"], 1.0)
+
+    def test_heldout_grammar_recall_is_raw_not_capped(self):
+        result = evaluate([{
+            "essay": "J", "version": "test", "run_id": "heldout-j",
+            "suggestions": [
+                {"dimension": "Language", "type": "Correction",
+                 "validity": "valid", "false_correction": False,
+                 "gold_match": match}
+                for match in ("J-L1", "J-L3", "J-L5")
+            ]
+        }])[0]
+        self.assertEqual(result["priority_recall"]["Language"]["fraction"], 0.6)
+
     def test_reject_invalid_gold_match(self):
         with self.assertRaises(ValueError):
             evaluate([{
