@@ -14,6 +14,15 @@ class GuardTests(unittest.TestCase):
             "Teachers should encourage independent thinking.",
             "Teachers should encourage independent thinking among students."))
 
+    def test_ai_tools_expansion_is_not_grammar(self):
+        self.assertTrue(is_known_false_correction(
+            "AI can also help students save time when preparing assignments.",
+            "AI tools can also help students save time when preparing assignments."))
+
+    def test_real_ai_agreement_error_kept(self):
+        self.assertFalse(is_known_false_correction(
+            "AI have disadvantages.", "AI has disadvantages."))
+
     def test_real_modal_error_kept(self):
         self.assertFalse(is_known_false_correction(
             "universities should allows", "universities should allow"))
