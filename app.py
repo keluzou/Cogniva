@@ -74,71 +74,107 @@ def openai_response(instructions, text):
 
 
 def generate_feedback_core(essay):
-    """Draft and independently review a shared factual feedback core."""
-    draft = openai_response(
-        "You are an EFL writing tutor. Read the student's English essay carefully. "
-        "Produce exactly two sections in concise, neutral English. "
-        "Section A, 'Writing strength': identify exactly ONE genuine strength "
-        "and quote a short phrase from the essay as evidence. "
-        "Section B, 'Revision suggestions': provide exactly FOUR numbered, "
-        "distinct and actionable suggestions based on real issues in the essay. "
-        "Each suggestion must use an accurate error category and an exact "
-        "original excerpt with a grammatically correct replacement. "
-        "Do not confuse subject-verb agreement with articles, plurals, or "
-        "prepositions. Avoid overlapping issues, invented errors, unsupported "
-        "claims, generic praise, and grading.",
-        essay,
-    )
-    reviewed = openai_response(
-        "You are an independent EFL feedback quality reviewer. "
-        "Check the draft feedback against the ORIGINAL ESSAY. "
-        "Correct any mislabeled grammar categories. Verify that every "
-        "quoted error actually appears in the original essay, and that "
-        "each proposed replacement is grammatically correct IN CONTEXT. "
-        "Do not suggest a replacement that breaks agreement with adjacent "
-        "words or changes the student's intended meaning. "
-        "Keep exactly ONE evidence-based writing strength and exactly FOUR "
-        "distinct numbered revision suggestions. If a point is wrong or "
-        "redundant, replace it with a genuine issue from the original essay. "
-        "Keep the two sections and a concise neutral style. "
-        "Return ONLY the corrected feedback, with no commentary. "
-        "Do not claim the feedback is error-free.",
-        "ORIGINAL ESSAY:\n" + essay + "\n\nDRAFT FEEDBACK:\n" + draft,
-    )
+    """Create structured, evidence-checked corrections before showing feedback."""
     import re
-    numbered = re.findall(r"(?m)^\s*([1-4])[.)]\s+", reviewed)
-    if sorted(numbered) != ["1", "2", "3", "4"]:
-        raise ValueError("Feedback review did not return four numbered suggestions")
-    return reviewed
+
+    instructions = (
+        "You are an EFL writing tutor and grammar editor. Return ONLY a valid JSON "
+        "object with keys 'strength_quote', 'strength_explanation', and 'suggestions'. "
+        "The strength_quote must be an exact short substring of the essay and the "
+        "explanation must identify one genuine writing strength without exaggeration. "
+        "suggestions must be an array of exactly four objects, each with keys "
+        "'category', 'original', 'replacement', 'explanation'. "
+        "For each correction, original MUST be a verbatim substring of the essay, "
+        "replacement must be correct in its original sentence context, and explanation "
+        "must accurately name the grammatical rule. Use distinct, high-priority issues. "
+        "Distinguish subject-verb agreement, modal + base verb, comparatives, articles, "
+        "and other categories precisely. No invented errors, no markdown."
+    )
+    draft = openai_response(instructions, essay)
+    reviewed = openai_response(
+        "You are an independent EFL feedback reviewer. Compare the original essay "
+        "and JSON draft. Correct mislabeled categories, invalid replacements, "
+        "overlapping points, and quotations not found verbatim in the essay. "
+        "Return ONLY a valid JSON object with the SAME schema: strength_quote, "
+        "strength_explanation, suggestions (exactly four objects with category, "
+        "original, replacement, explanation). Do not include markdown.",
+        "ORIGINAL ESSAY:\\n" + essay + "\\n\\nDRAFT JSON:\\n" + draft,
+    )
+    try:
+        data = json.loads(reviewed)
+    except json.JSONDecodeError as exc:
+        raise ValueError("Feedback is not valid JSON") from exc
+    if not isinstance(data, dict) or not isinstance(data.get("suggestions"), list):
+        raise ValueError("Invalid feedback structure")
+    suggestions = data["suggestions"]
+    if len(suggestions) != 4:
+        raise ValueError("Expected exactly four suggestions")
+    quote = data.get("strength_quote")
+    explanation = data.get("strength_explanation")
+    if not isinstance(quote, str) or not quote.strip() or quote not in essay:
+        raise ValueError("Strength evidence not found in essay")
+    if not isinstance(explanation, str) or not explanation.strip():
+        raise ValueError("Missing strength explanation")
+    seen = set()
+    for item in suggestions:
+        if not isinstance(item, dict):
+            raise ValueError("Invalid correction")
+        for field in ("category", "original", "replacement", "explanation"):
+            if not isinstance(item.get(field), str) or not item[field].strip():
+                raise ValueError("Incomplete correction")
+        original = item["original"]
+        if original not in essay or original == item["replacement"]:
+            raise ValueError("Correction source missing or unchanged")
+        if original in seen:
+            raise ValueError("Duplicate correction")
+        seen.add(original)
+    return data
+
+
+def format_feedback_core(data):
+    """Render the same validated correction items for both conditions."""
+    lines = [
+        "Writing strength:",
+        data["strength_explanation"] + ' Example: "' + data["strength_quote"] + '"',
+        "",
+        "Revision suggestions:",
+        "",
+    ]
+    for i, item in enumerate(data["suggestions"], 1):
+        lines.append(
+            f'{i}. {item["category"]}: Replace "{item["original"]}" '
+            f'with "{item["replacement"]}". {item["explanation"]}'
+        )
+    return "\\n".join(lines)
 
 
 def style_feedback(core, condition):
-    """Keep core feedback identical; vary only interpersonal expression."""
+    """Only praise/closing vary; the four corrections are rendered identically."""
+    factual = format_feedback_core(core)
     if condition == "neutral":
-        return core
-    return openai_response(
-        "Rewrite the supplied writing feedback into a warm, enthusiastic, "
-        "supportive message for an EFL learner. In the 'Writing strength' "
-        "section, praise the SPECIFIC genuine strength already identified, "
-        "explain why it works, and celebrate it naturally! Use expressive "
-        "exclamation marks and around 4-7 varied, friendly emojis throughout "
-        "the entire feedback, especially in the specific praise and closing "
-        "encouragement. Include expressive face emojis such as 🤩 🥰 😊 🥹 😘 "
-        "as well as 🌟 ✨ 👏. Use them naturally, not after every sentence; "
-        "keep revision examples and grammar explanations free of emojis. "
-        "A playful phrase such as 'Love this!' or 'Nice work!' is welcome "
-        "when supported by a genuine strength, but avoid invented praise, "
-        "exaggerated claims about ability, or overly intimate comments. "
-        "In the 'Revision suggestions' "
-        "section, keep the EXACT SAME four numbered issues, corrections, "
-        "examples and actionable advice. Make their wording constructive "
-        "and encouraging without adding new information. Do not invent "
-        "strengths or errors. Do not add extra revision points. "
-        "Use most emojis in the praise section and a few in the closing. "
-        "Preserve the factual content and the four correction points.",
-        core,
+        return factual
+    praise = openai_response(
+        "Write TWO short paragraphs of encouraging, expressive EFL feedback. "
+        "Return ONLY a JSON object with string fields 'opening' and 'closing'. "
+        "In opening, praise only the documented writing strength and quote the "
+        "provided exact evidence. In closing, encourage revision. Use 4-7 "
+        "friendly emojis total, mostly in opening, including expressive faces. "
+        "Do NOT include any correction suggestions or new factual claims. "
+        "Do NOT use markdown.",
+        json.dumps({
+            "strength_quote": core["strength_quote"],
+            "strength_explanation": core["strength_explanation"],
+        }, ensure_ascii=False),
     )
-
+    try:
+        parts = json.loads(praise)
+        opening, closing = parts["opening"], parts["closing"]
+        if not all(isinstance(v, str) and v.strip() for v in (opening, closing)):
+            raise ValueError("Empty supportive wording")
+    except (ValueError, KeyError, TypeError):
+        raise ValueError("Invalid supportive wording")
+    corrections = factual.split("Revision suggestions:", 1)[1]
+    return "Writing strength:\\n" + opening + "\\n\\nRevision suggestions:" + corrections + "\\n\\n" + closing
 
 
 def generate_writing_feedback(essay, condition):
@@ -302,7 +338,7 @@ if "researcher_feedback_cache" not in st.session_state:
 st.title("Cogniva")
 st.caption("Language · Cognition · AI")
 st.header("Cogniva Write")
-st.caption("Version 0.8 · Reviewed Feedback Core · Secure Submission Storage")
+st.caption("Version 0.9 · Structured Feedback Core · Secure Submission Storage")
 test_mode = bool(st.session_state.get("researcher_test_mode", False) and st.session_state.get("admin_authenticated", False))
 if test_mode:
     st.warning("RESEARCHER TEST MODE — Responses will be marked as test data.")
@@ -431,7 +467,7 @@ elif st.session_state.stage == 2:
             if cached:
                 st.caption("The neutral version is the original factual core. The supportive version rewrites its tone.")
                 st.markdown("**Neutral feedback**")
-                st.info(cached["core"])
+                st.info(format_feedback_core(cached["core"]))
                 if "supportive" not in cached:
                     if st.button("Generate supportive comparison", key="generate_comparison"):
                         with st.spinner("Generating supportive wording..."):
@@ -505,7 +541,7 @@ elif st.session_state.stage == 3:
                 **st.session_state.initial_data,
                 "feedback_condition":
                     st.session_state.feedback_condition,
-                "feedback_type": "ai_generated_v0_8_test" if test_mode else "ai_generated_v0_8",
+                "feedback_type": "ai_generated_v0_9_test" if test_mode else "ai_generated_v0_9",
                 "feedback_text": st.session_state.feedback_text,
                 "feedback_word_count": len(
                     st.session_state.feedback_text.split()
