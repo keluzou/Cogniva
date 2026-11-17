@@ -23,7 +23,7 @@ def is_known_false_correction(original, replacement):
             return True
     # AI is a grammatical noun phrase on its own. Expanding it to
     # "AI tools" does not repair a grammatical error.
-    ai_expanded = re.sub(r"\\bAI\\b", "AI tools", original, count=1)
+    ai_expanded = re.sub(r"\bAI\b", "AI tools", original, count=1)
     if ai_expanded != original and ai_expanded.casefold() == replacement.casefold():
         return True
     # Changing certainty is not a grammatical repair.
