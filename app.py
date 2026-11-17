@@ -80,7 +80,11 @@ def _generate_feedback_core_once(essay):
         "strength_explanation, suggestions. strength_quote is an exact substring "
         "of the essay. Praise a genuine strength without exaggeration. "
         "suggestions is an array of 0 to 6 objects, each with keys dimension, "
-        "category, original, replacement, explanation. Dimension must be exactly "
+         "category, type, original, replacement, explanation. Type must be exactly "
+        "Correction or Improvement. Correction means a demonstrably incorrect "
+        "form; Improvement means an acceptable passage with a specific, justified "
+        "opportunity to improve it. Do not call optional style changes errors. "
+        "Dimension must be exactly "
         "Language, Content, or Organization. Use at most 3 Language, 2 Content, "
         "and 1 Organization suggestions. Do not invent issues to fill quotas. "
         "Every original must be a verbatim, concise, nonempty substring of the essay. "
@@ -88,7 +92,11 @@ def _generate_feedback_core_once(essay):
         "For Content and Organization, replacement must be a specific, actionable "
         "revision instruction, NOT a fabricated quote or a full rewritten essay. "
         "Explain the specific issue and what successful revision would achieve. "
-        "Each suggestion must target one distinct issue and avoid overlap. "
+         "Each suggestion must target one distinct issue and avoid overlap, even "
+        "if two quotes differ. Do not give two suggestions that ask for the same "
+        "examples or reasons. Organization suggestions must identify a genuine "
+        "logical-order or cohesion issue; do not request a longer conclusion "
+        "just because it is short, especially for a 100-150 word essay. "
         "If a text is grammatically correct but weakly argued, give specific "
         "Content suggestions rather than inventing grammar mistakes. "
         "Do not praise grammar in a quote containing grammatical errors. "
@@ -99,7 +107,10 @@ def _generate_feedback_core_once(essay):
         "Independently review this EFL essay and draft JSON. Return ONLY corrected "
         "JSON with EXACTLY the same schema: strength_quote, strength_explanation, "
         "suggestions (array of 0 to 6 objects with dimension, category, original, "
-        "replacement, explanation). Verify verbatim source quotes and correctness. "
+         "replacement, explanation, type). type is Correction or Improvement. "
+        "Verify verbatim source quotes and correctness. Never treat an optional "
+        "wording change as a Correction. Remove overlapping Content advice, "
+        "and avoid generic requests to expand an adequate short conclusion. "
         "Keep at most 3 Language, 2 Content, and 1 Organization items. "
         "Remove invented, redundant, vague, or unsupported items. For Content and "
         "Organization, replacement must be an actionable revision instruction, "
@@ -127,9 +138,11 @@ def _generate_feedback_core_once(essay):
     for item in suggestions:
         if not isinstance(item, dict):
             raise ValueError("Invalid feedback item")
-        for field in ("dimension", "category", "original", "replacement", "explanation"):
+        for field in ("dimension", "category", "type", "original", "replacement", "explanation"):
             if not isinstance(item.get(field), str) or not item[field].strip():
                 raise ValueError("Incomplete feedback item")
+        if item["type"] not in ("Correction", "Improvement"):
+            raise ValueError("Unknown feedback type")
         dimension = item["dimension"]
         if dimension not in counts:
             raise ValueError("Unknown feedback dimension")
@@ -186,7 +199,7 @@ def format_feedback_core(data):
         else:
             advice = f'Evidence: "{item["original"]}". Action: {item["replacement"]}'
         lines.append(
-            f'{i}. [{item["dimension"]}] {item["category"]}: '
+            f'{i}. [{item["dimension"]} · {item["type"]}] {item["category"]}: '
             f'{advice} {item["explanation"]}'
         )
     return "\n".join(lines)
@@ -415,7 +428,7 @@ if "researcher_feedback_cache" not in st.session_state:
 st.title("Cogniva")
 st.caption("Language · Cognition · AI")
 st.header("Cogniva Write")
-st.caption("Version 1.0 · Structured Feedback Core · Secure Submission Storage")
+st.caption("Version 1.1 · Structured Feedback Core · Secure Submission Storage")
 test_mode = bool(st.session_state.get("researcher_test_mode", False) and st.session_state.get("admin_authenticated", False))
 if test_mode:
     st.warning("RESEARCHER TEST MODE — Responses will be marked as test data.")
@@ -619,7 +632,7 @@ elif st.session_state.stage == 3:
                 **st.session_state.initial_data,
                 "feedback_condition":
                     st.session_state.feedback_condition,
-                "feedback_type": "ai_generated_v1_0_test" if test_mode else "ai_generated_v1_0",
+                "feedback_type": "ai_generated_v1_1_test" if test_mode else "ai_generated_v1_1",
                 "feedback_text": st.session_state.feedback_text,
                 "feedback_word_count": len(
                     st.session_state.feedback_text.split()
