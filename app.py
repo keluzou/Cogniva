@@ -626,7 +626,7 @@ if "researcher_feedback_cache" not in st.session_state:
 st.title("Cogniva")
 st.caption("Language · Cognition · AI")
 st.header("Cogniva Write")
-st.caption("Version 1.5.5 · Structured Feedback Core · Secure Submission Storage")
+st.caption("Version 1.5.6 · Structured Feedback Core · Secure Submission Storage")
 test_mode = bool(st.session_state.get("researcher_test_mode", False) and st.session_state.get("admin_authenticated", False))
 if test_mode:
     st.warning("RESEARCHER TEST MODE — Responses will be marked as test data.")
@@ -836,7 +836,7 @@ elif st.session_state.stage == 3:
                 **st.session_state.initial_data,
                 "feedback_condition":
                     st.session_state.feedback_condition,
-                "feedback_type": "ai_generated_v1_5_5_test" if test_mode else "ai_generated_v1_5_5",
+                "feedback_type": "ai_generated_v1_5_6_test" if test_mode else "ai_generated_v1_5_6",
                 "feedback_text": st.session_state.feedback_text,
                 "feedback_word_count": len(
                     st.session_state.feedback_text.split()
