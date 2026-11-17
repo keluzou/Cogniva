@@ -74,39 +74,37 @@ def openai_response(instructions, text):
 
 
 def _generate_feedback_core_once(essay):
-    """Create structured, evidence-checked corrections before showing feedback."""
-    import re
-
+    """Create an evidence-grounded feedback core across three dimensions."""
     instructions = (
-        "You are an EFL writing tutor and grammar editor. Return ONLY a valid JSON "
-        "object with keys 'strength_quote', 'strength_explanation', and 'suggestions'. "
-        "The strength_quote must be an exact short substring of the essay and the "
-        "explanation must identify one genuine writing strength without exaggeration. "
-        "suggestions must be an array of zero to four objects, each with keys "
-        "'category', 'original', 'replacement', 'explanation'. "
-        "For each correction, original MUST be a verbatim substring of the essay, "
-        "replacement must be correct in its original sentence context, and explanation "
-        "must accurately name the grammatical rule. Use only genuine, distinct, high-priority errors. If the essay has no clear errors, return an empty suggestions array. Never invent corrections to reach a quota. "
-        "Distinguish subject-verb agreement, modal + base verb, comparatives, articles, "
-        "and other categories precisely. When an error follows can, should, must, "
-        "may, might, will, would, could, or shall, label it modal + base verb, "
-        "NOT subject-verb agreement. Praise ideas, examples, organization, or "
-        "argumentation rather than grammatical accuracy when the cited passage "
-        "contains an error. Prefer a grammatically correct quote when possible. "
-        "No invented errors, no markdown."
+        "You are an EFL writing tutor. Return ONLY JSON with keys strength_quote, "
+        "strength_explanation, suggestions. strength_quote is an exact substring "
+        "of the essay. Praise a genuine strength without exaggeration. "
+        "suggestions is an array of 0 to 6 objects, each with keys dimension, "
+        "category, original, replacement, explanation. Dimension must be exactly "
+        "Language, Content, or Organization. Use at most 3 Language, 2 Content, "
+        "and 1 Organization suggestions. Do not invent issues to fill quotas. "
+        "Every original must be a verbatim, concise, nonempty substring of the essay. "
+        "For Language, replacement must be a correct replacement for original in context. "
+        "For Content and Organization, replacement must be a specific, actionable "
+        "revision instruction, NOT a fabricated quote or a full rewritten essay. "
+        "Explain the specific issue and what successful revision would achieve. "
+        "Each suggestion must target one distinct issue and avoid overlap. "
+        "If a text is grammatically correct but weakly argued, give specific "
+        "Content suggestions rather than inventing grammar mistakes. "
+        "Do not praise grammar in a quote containing grammatical errors. "
+        "Modal verbs take the base verb form. Return no markdown."
     )
     draft = openai_response(instructions, essay)
     reviewed = openai_response(
-        "You are an independent EFL feedback reviewer. Compare the original essay "
-        "and JSON draft. Correct mislabeled categories, invalid replacements, "
-         "overlapping points, and quotations not found verbatim in the essay. "
-        "Do not praise grammatical accuracy or correct word choice in a quote "
-        "that contains an error. A modal verb followed by an incorrect verb "
-        "form is a modal + base verb error, not subject-verb agreement. "
-        "Return ONLY a valid JSON object with the SAME schema: strength_quote, "
-        "strength_explanation, suggestions (zero to four objects with category, "
-        "original, replacement, explanation). Do not include markdown.",
-        "ORIGINAL ESSAY:\n" + essay + "\n\nDRAFT JSON:\n" + draft,
+        "Independently review this EFL essay and draft JSON. Return ONLY corrected "
+        "JSON with EXACTLY the same schema: strength_quote, strength_explanation, "
+        "suggestions (array of 0 to 6 objects with dimension, category, original, "
+        "replacement, explanation). Verify verbatim source quotes and correctness. "
+        "Keep at most 3 Language, 2 Content, and 1 Organization items. "
+        "Remove invented, redundant, vague, or unsupported items. For Content and "
+        "Organization, replacement must be an actionable revision instruction, "
+        "not a rewritten essay. Never force a quota.",
+        "ORIGINAL ESSAY:\\n" + essay + "\\n\\nDRAFT JSON:\\n" + draft,
     )
     try:
         data = json.loads(reviewed)
@@ -115,54 +113,53 @@ def _generate_feedback_core_once(essay):
     if not isinstance(data, dict) or not isinstance(data.get("suggestions"), list):
         raise ValueError("Invalid feedback structure")
     suggestions = data["suggestions"]
-    if len(suggestions) > 4:
-        raise ValueError("Expected at most four suggestions")
+    if len(suggestions) > 6:
+        raise ValueError("Too many feedback suggestions")
     quote = data.get("strength_quote")
     explanation = data.get("strength_explanation")
     if not isinstance(quote, str) or not quote.strip() or quote not in essay:
         raise ValueError("Strength evidence not found in essay")
     if not isinstance(explanation, str) or not explanation.strip():
         raise ValueError("Missing strength explanation")
+    counts = {"Language": 0, "Content": 0, "Organization": 0}
     seen = set()
+    import re
     for item in suggestions:
         if not isinstance(item, dict):
-            raise ValueError("Invalid correction")
-        for field in ("category", "original", "replacement", "explanation"):
+            raise ValueError("Invalid feedback item")
+        for field in ("dimension", "category", "original", "replacement", "explanation"):
             if not isinstance(item.get(field), str) or not item[field].strip():
-                raise ValueError("Incomplete correction")
+                raise ValueError("Incomplete feedback item")
+        dimension = item["dimension"]
+        if dimension not in counts:
+            raise ValueError("Unknown feedback dimension")
+        counts[dimension] += 1
+        if counts[dimension] > {"Language": 3, "Content": 2, "Organization": 1}[dimension]:
+            raise ValueError("Too many suggestions for dimension")
         original = item["original"]
-        if original not in essay or original == item["replacement"]:
-            raise ValueError("Correction source missing or unchanged")
-        if original in seen:
-            raise ValueError("Duplicate correction")
+        if original not in essay or original in seen:
+            raise ValueError("Missing or duplicate feedback evidence")
         seen.add(original)
-        # Deterministic category guard for modal + verb errors.
-        # This does not certify that the proposed replacement is correct.
-        modal_pattern = re.compile(
-            r"\\b(can|could|should|would|will|shall|may|might|must)\\s+"
-            r"([A-Za-z]+)\\b", re.IGNORECASE
-        )
-        for match in modal_pattern.finditer(original):
-            modal = match.group(1)
-            source_verb = match.group(2)
-            corrected = re.search(
-                r"\\b" + re.escape(modal) + r"\\s+([A-Za-z]+)\\b",
-                item["replacement"], re.IGNORECASE
-            )
-            if (corrected and source_verb.lower() != corrected.group(1).lower()
-                    and source_verb.lower().endswith("s")
-                    and source_verb[:-1].lower() == corrected.group(1).lower()):
-                item["category"] = "modal + base verb"
-                item["explanation"] = (
-                    f"After the modal verb '{modal.lower()}', use the base form "
-                    f"'{corrected.group(1)}' rather than '{source_verb}'."
-                )
-                break
+        if dimension == "Language":
+            if original == item["replacement"]:
+                raise ValueError("Unchanged language correction")
+            pattern = re.compile(r"\\b(can|could|should|would|will|shall|may|might|must)\\s+([A-Za-z]+)\\b", re.I)
+            for match in pattern.finditer(original):
+                corrected = re.search(r"\\b" + re.escape(match.group(1)) + r"\\s+([A-Za-z]+)\\b", item["replacement"], re.I)
+                source_verb = match.group(2)
+                if (corrected and source_verb.lower().endswith("s")
+                        and source_verb[:-1].lower() == corrected.group(1).lower()):
+                    item["category"] = "modal + base verb"
+                    item["explanation"] = (
+                        f"After the modal verb '{match.group(1).lower()}', use the base "
+                        f"form '{corrected.group(1)}' rather than '{source_verb}'."
+                    )
+                    break
     return data
 
 
 def generate_feedback_core(essay):
-    """Retry malformed or invalid AI feedback once with a fresh generation."""
+    """Retry malformed or invalid feedback once."""
     last_error = None
     for _ in range(2):
         try:
@@ -173,7 +170,7 @@ def generate_feedback_core(essay):
 
 
 def format_feedback_core(data):
-    """Render the same validated correction items for both conditions."""
+    """Render identical substantive revision advice in both conditions."""
     lines = [
         "Writing strength:",
         data["strength_explanation"] + ' Example: "' + data["strength_quote"] + '"',
@@ -182,11 +179,15 @@ def format_feedback_core(data):
         "",
     ]
     if not data["suggestions"]:
-        lines.append("No clear language errors identified. Review the essay for clarity and organization.")
+        lines.append("No specific revision targets identified.")
     for i, item in enumerate(data["suggestions"], 1):
+        if item["dimension"] == "Language":
+            advice = f'Replace "{item["original"]}" with "{item["replacement"]}".'
+        else:
+            advice = f'Evidence: "{item["original"]}". Action: {item["replacement"]}'
         lines.append(
-            f'{i}. {item["category"]}: Replace "{item["original"]}" '
-            f'with "{item["replacement"]}". {item["explanation"]}'
+            f'{i}. [{item["dimension"]}] {item["category"]}: '
+            f'{advice} {item["explanation"]}'
         )
     return "\n".join(lines)
 
@@ -414,7 +415,7 @@ if "researcher_feedback_cache" not in st.session_state:
 st.title("Cogniva")
 st.caption("Language · Cognition · AI")
 st.header("Cogniva Write")
-st.caption("Version 0.9.3 · Structured Feedback Core · Secure Submission Storage")
+st.caption("Version 1.0 · Structured Feedback Core · Secure Submission Storage")
 test_mode = bool(st.session_state.get("researcher_test_mode", False) and st.session_state.get("admin_authenticated", False))
 if test_mode:
     st.warning("RESEARCHER TEST MODE — Responses will be marked as test data.")
@@ -618,7 +619,7 @@ elif st.session_state.stage == 3:
                 **st.session_state.initial_data,
                 "feedback_condition":
                     st.session_state.feedback_condition,
-                "feedback_type": "ai_generated_v0_9_1_test" if test_mode else "ai_generated_v0_9_1",
+                "feedback_type": "ai_generated_v1_0_test" if test_mode else "ai_generated_v1_0",
                 "feedback_text": st.session_state.feedback_text,
                 "feedback_word_count": len(
                     st.session_state.feedback_text.split()
