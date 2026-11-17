@@ -243,6 +243,7 @@ def admin_panel():
     if st.button("Sign out"):
         st.session_state.admin_authenticated = False
         st.session_state.researcher_test_mode = False
+        st.query_params["view"] = "researcher"
         st.rerun()
     st.divider()
     st.subheader("Researcher Test Mode")
@@ -254,7 +255,7 @@ def admin_panel():
         st.session_state.feedback_condition = None
         st.session_state.feedback_text = ""
         st.session_state.pop("pending_record_id", None)
-        st.query_params.clear()
+        st.query_params["view"] = "test"
         st.rerun()
     try:
         rows = db_request(
@@ -316,10 +317,42 @@ def admin_panel():
     )
 
 
+# Stable researcher navigation: keep the view in the URL across refreshes.
+view = st.query_params.get("view", "")
 if st.query_params.get("admin") == "1":
+    st.query_params["view"] = "researcher"
+    del st.query_params["admin"]
+    view = "researcher"
+
+with st.sidebar:
+    st.markdown("### Cogniva Write")
+    if st.button("Participant writing", use_container_width=True):
+        st.session_state.researcher_test_mode = False
+        st.query_params["view"] = "participant"
+        st.rerun()
+    if st.button("Researcher Login / Dashboard", use_container_width=True):
+        st.query_params["view"] = "researcher"
+        st.rerun()
+    if st.session_state.get("admin_authenticated", False):
+        if st.button("Researcher Test Mode", use_container_width=True):
+            st.session_state.researcher_test_mode = True
+            st.query_params["view"] = "test"
+            st.rerun()
+
+if view == "researcher":
     st.title("Cogniva Write")
     admin_panel()
     st.stop()
+
+if view == "test":
+    if not st.session_state.get("admin_authenticated", False):
+        st.title("Cogniva Write")
+        st.info("Please sign in to access Researcher Test Mode.")
+        admin_panel()
+        st.stop()
+    st.session_state.researcher_test_mode = True
+else:
+    st.session_state.researcher_test_mode = False
 
 TOPIC = "Should university students use AI tools to support their learning?"
 
@@ -381,7 +414,7 @@ if "researcher_feedback_cache" not in st.session_state:
 st.title("Cogniva")
 st.caption("Language · Cognition · AI")
 st.header("Cogniva Write")
-st.caption("Version 0.9.2 · Structured Feedback Core · Secure Submission Storage")
+st.caption("Version 0.9.3 · Structured Feedback Core · Secure Submission Storage")
 test_mode = bool(st.session_state.get("researcher_test_mode", False) and st.session_state.get("admin_authenticated", False))
 if test_mode:
     st.warning("RESEARCHER TEST MODE — Responses will be marked as test data.")
@@ -398,6 +431,7 @@ if test_mode:
         st.success("Researcher feedback cache cleared.")
     if st.button("Exit test mode"):
         st.session_state.researcher_test_mode = False
+        st.query_params["view"] = "researcher"
         st.session_state.stage = 1
         st.session_state.initial_data = {}
         st.session_state.feedback_condition = None
