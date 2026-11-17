@@ -110,7 +110,9 @@ def _generate_feedback_core_once(essay):
          "replacement, explanation, type). type is Correction or Improvement. "
         "Verify verbatim source quotes and correctness. Never treat an optional "
         "wording change as a Correction. Remove overlapping Content advice, "
-        "and avoid generic requests to expand an adequate short conclusion. "
+         "and avoid generic requests to expand an adequate short conclusion. "
+        "For Organization, describe the coherence problem and the desired "
+        "relationship, not a mandatory technique such as combining sentences. "
         "Keep at most 3 Language, 2 Content, and 1 Organization items. "
         "Remove invented, redundant, vague, or unsupported items. For Content and "
         "Organization, replacement must be an actionable revision instruction, "
@@ -216,7 +218,10 @@ def style_feedback(core, condition):
         "In opening, praise only the documented writing strength and quote the "
         "provided exact evidence. In closing, encourage revision. Use 4-7 "
         "friendly emojis total, mostly in opening, including expressive faces. "
-        "Do NOT include any correction suggestions or new factual claims. "
+         "Do NOT include any correction suggestions, revision advice, writing "
+        "strategies, or new factual claims. The closing must be ONLY emotional "
+        "encouragement, without telling the learner what to add, change, "
+        "explain, clarify, expand, reorganize, or focus on. "
         "Do NOT use markdown.",
         json.dumps({
             "strength_quote": core["strength_quote"],
@@ -230,6 +235,11 @@ def style_feedback(core, condition):
             raise ValueError("Empty supportive wording")
     except (ValueError, KeyError, TypeError):
         raise ValueError("Invalid supportive wording")
+    # Reject additional advice in supportive-only wording before display.
+    # This is a conservative heuristic; researcher preview remains necessary.
+    advice_pattern = re.compile(r"\\b(consider|try to|you (?:could|should|might)|add|expand|explain|clarify|reorganize|include|provide|revise|focus on|work on|improve by)\\b", re.I)
+    if advice_pattern.search(opening) or advice_pattern.search(closing):
+        raise ValueError("Supportive wording contains additional revision advice")
     corrections = factual.split("Revision suggestions:", 1)[1]
     return "Writing strength:\n" + opening + "\n\nRevision suggestions:" + corrections + "\n\n" + closing
 
@@ -428,7 +438,7 @@ if "researcher_feedback_cache" not in st.session_state:
 st.title("Cogniva")
 st.caption("Language · Cognition · AI")
 st.header("Cogniva Write")
-st.caption("Version 1.1 · Structured Feedback Core · Secure Submission Storage")
+st.caption("Version 1.2 · Structured Feedback Core · Secure Submission Storage")
 test_mode = bool(st.session_state.get("researcher_test_mode", False) and st.session_state.get("admin_authenticated", False))
 if test_mode:
     st.warning("RESEARCHER TEST MODE — Responses will be marked as test data.")
@@ -632,7 +642,7 @@ elif st.session_state.stage == 3:
                 **st.session_state.initial_data,
                 "feedback_condition":
                     st.session_state.feedback_condition,
-                "feedback_type": "ai_generated_v1_1_test" if test_mode else "ai_generated_v1_1",
+                "feedback_type": "ai_generated_v1_2_test" if test_mode else "ai_generated_v1_2",
                 "feedback_text": st.session_state.feedback_text,
                 "feedback_word_count": len(
                     st.session_state.feedback_text.split()
