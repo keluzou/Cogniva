@@ -1,0 +1,97 @@
+[
+  {
+    "essay": "F",
+    "version": "v1.5",
+    "run_id": "F-observed-1",
+    "same_substantive_feedback": true,
+    "suggestions": [
+      {
+        "dimension": "Content",
+        "type": "Improvement",
+        "validity": "valid",
+        "false_correction": false,
+        "gold_match": "F-C1"
+      },
+      {
+        "dimension": "Organization",
+        "type": "Improvement",
+        "validity": "valid",
+        "false_correction": false,
+        "gold_match": null
+      },
+      {
+        "dimension": "Language",
+        "type": "Correction",
+        "validity": "invalid",
+        "false_correction": true,
+        "gold_match": null
+      },
+      {
+        "dimension": "Language",
+        "type": "Improvement",
+        "validity": "valid",
+        "false_correction": false,
+        "gold_match": null
+      }
+    ]
+  },
+  {
+    "essay": "H",
+    "version": "v1.5.1",
+    "run_id": "H-observed-1",
+    "same_substantive_feedback": true,
+    "suggestions": [
+      {
+        "dimension": "Content",
+        "type": "Improvement",
+        "validity": "valid",
+        "false_correction": false,
+        "gold_match": null
+      }
+    ]
+  },
+  {
+    "essay": "E",
+    "version": "v1.5",
+    "run_id": "E-observed-1",
+    "same_substantive_feedback": true,
+    "suggestions": [
+      {
+        "dimension": "Language",
+        "type": "Correction",
+        "validity": "valid",
+        "false_correction": false,
+        "gold_match": "E-L1"
+      },
+      {
+        "dimension": "Language",
+        "type": "Correction",
+        "validity": "valid",
+        "false_correction": false,
+        "gold_match": "E-L4"
+      },
+      {
+        "dimension": "Language",
+        "type": "Correction",
+        "validity": "valid",
+        "false_correction": false,
+        "gold_match": "E-L6"
+      }
+    ]
+  },
+  {
+    "essay": "G",
+    "version": "v1.5",
+    "run_id": "G-observed-1",
+    "same_substantive_feedback": true,
+    "suggestions": [
+      {
+        "dimension": "Language",
+        "type": "Improvement",
+        "validity": "invalid",
+        "false_correction": false,
+        "gold_match": null
+      }
+    ]
+  }
+]
