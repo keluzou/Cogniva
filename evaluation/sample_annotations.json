@@ -217,5 +217,41 @@
         "gold_match": "I-O1"
       }
     ]
+  },
+  {
+    "essay": "J",
+    "version": "v1.5.7",
+    "run_id": "J-observed-1",
+    "same_substantive_feedback": true,
+    "suggestions": [
+      {
+        "dimension": "Language",
+        "type": "Correction",
+        "validity": "valid",
+        "false_correction": false,
+        "gold_match": "J-L1"
+      },
+      {
+        "dimension": "Language",
+        "type": "Correction",
+        "validity": "valid",
+        "false_correction": false,
+        "gold_match": "J-L3"
+      },
+      {
+        "dimension": "Language",
+        "type": "Correction",
+        "validity": "valid",
+        "false_correction": false,
+        "gold_match": "J-L5"
+      },
+      {
+        "dimension": "Organization",
+        "type": "Improvement",
+        "validity": "invalid",
+        "false_correction": false,
+        "gold_match": null
+      }
+    ]
   }
 ]
