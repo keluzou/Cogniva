@@ -1,0 +1,23 @@
+name: Python checks
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Compile Python source
+        run: python -m compileall -q app.py feedback_guard.py evaluation
+      - name: Test guard
+        run: python -m unittest -v test_feedback_guard.py
+      - name: Test evaluation
+        run: cd evaluation && python -m unittest -v test_evaluate.py
+      - name: Evaluate labeled pilot
+        run: python evaluation/evaluate.py evaluation/sample_annotations.json
