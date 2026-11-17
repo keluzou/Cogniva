@@ -104,8 +104,8 @@ def generate_writing_feedback(essay, condition):
         "and encouraging without adding new information. Do not invent "
         "strengths or errors. Do not add extra revision points. "
         "Use emojis primarily in the praise section. "
-        "Here is the shared factual feedback:\\n\\n" + core,
-        "Rewrite the provided feedback while preserving its factual content.",
+        "Preserve the factual content and the four correction points.",
+        core,
     )
 
 
