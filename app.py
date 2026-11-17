@@ -1,5 +1,6 @@
 
 import csv
+import hashlib
 import hmac
 import io
 import json
@@ -72,9 +73,9 @@ def openai_response(instructions, text):
     return answer
 
 
-def generate_writing_feedback(essay, condition):
-    """Generate shared evidence-based content, then vary interpersonal style."""
-    core = openai_response(
+def generate_feedback_core(essay):
+    """Generate one factual feedback core for the supplied essay."""
+    return openai_response(
         "You are an EFL writing tutor. Read the student's English essay carefully. "
         "Produce two sections in concise, neutral English. "
         "Section A, 'Writing strength': identify exactly ONE specific, genuine "
@@ -88,6 +89,10 @@ def generate_writing_feedback(essay, condition):
         "Avoid generic compliments. Keep the content clear and concise.",
         essay,
     )
+
+
+def style_feedback(core, condition):
+    """Keep core feedback identical; vary only interpersonal expression."""
     if condition == "neutral":
         return core
     return openai_response(
@@ -113,6 +118,10 @@ def generate_writing_feedback(essay, condition):
         core,
     )
 
+
+
+def generate_writing_feedback(essay, condition):
+    return style_feedback(generate_feedback_core(essay), condition)
 
 
 def admin_panel():
@@ -266,10 +275,13 @@ if "feedback_condition" not in st.session_state:
 if "feedback_text" not in st.session_state:
     st.session_state.feedback_text = ""
 
+if "researcher_feedback_cache" not in st.session_state:
+    st.session_state.researcher_feedback_cache = {}
+
 st.title("Cogniva")
 st.caption("Language · Cognition · AI")
 st.header("Cogniva Write")
-st.caption("Version 0.6 · AI Writing Feedback · Secure Submission Storage")
+st.caption("Version 0.7 · Shared Feedback Core · Secure Submission Storage")
 test_mode = bool(st.session_state.get("researcher_test_mode", False) and st.session_state.get("admin_authenticated", False))
 if test_mode:
     st.warning("RESEARCHER TEST MODE — Responses will be marked as test data.")
@@ -280,6 +292,10 @@ if test_mode:
         key="researcher_condition",
         disabled=st.session_state.stage != 1,
     )
+    st.caption("Identical essays in this researcher session reuse one factual feedback core.")
+    if st.button("Clear test feedback cache"):
+        st.session_state.researcher_feedback_cache = {}
+        st.success("Researcher feedback cache cleared.")
     if st.button("Exit test mode"):
         st.session_state.researcher_test_mode = False
         st.session_state.stage = 1
@@ -349,9 +365,20 @@ if st.session_state.stage == 1:
             else:
                 with st.spinner("Generating writing feedback..."):
                     try:
-                        st.session_state.feedback_text = generate_writing_feedback(
-                            initial_essay, condition
-                        )
+                        if test_mode:
+                            essay_hash = hashlib.sha256(initial_essay.encode("utf-8")).hexdigest()
+                            cached = st.session_state.researcher_feedback_cache.get(essay_hash)
+                            if cached is None:
+                                cached = {"core": generate_feedback_core(initial_essay)}
+                                st.session_state.researcher_feedback_cache[essay_hash] = cached
+                            if condition not in cached:
+                                cached[condition] = style_feedback(cached["core"], condition)
+                            st.session_state.feedback_text = cached[condition]
+                            st.session_state.active_test_essay_hash = essay_hash
+                        else:
+                            st.session_state.feedback_text = generate_writing_feedback(
+                                initial_essay, condition
+                            )
                     except HTTPError as exc:
                         # Only show status and allowlisted error code; never expose credentials.
                         api_error_code = "unknown"
@@ -375,6 +402,28 @@ elif st.session_state.stage == 2:
     st.subheader("Step 2: Writing Feedback")
 
     st.info(st.session_state.feedback_text)
+
+    if test_mode:
+        with st.expander("Researcher comparison: same feedback core", expanded=False):
+            essay_hash = st.session_state.get("active_test_essay_hash")
+            cached = st.session_state.researcher_feedback_cache.get(essay_hash, {})
+            if cached:
+                st.caption("The neutral version is the original factual core. The supportive version rewrites its tone.")
+                st.markdown("**Neutral feedback**")
+                st.info(cached["core"])
+                if "supportive" not in cached:
+                    if st.button("Generate supportive comparison", key="generate_comparison"):
+                        with st.spinner("Generating supportive wording..."):
+                            try:
+                                cached["supportive"] = style_feedback(cached["core"], "supportive")
+                            except (HTTPError, URLError, TimeoutError, ValueError, KeyError, TypeError):
+                                st.error("Could not generate the comparison. Please try again.")
+                            else:
+                                st.rerun()
+                if "supportive" in cached:
+                    st.markdown("**Supportive feedback**")
+                    st.info(cached["supportive"])
+                st.caption("Researcher preview only. Verify that all four correction points match before formal use.")
 
     st.caption(
         "Please read the feedback carefully before revising."
@@ -435,7 +484,7 @@ elif st.session_state.stage == 3:
                 **st.session_state.initial_data,
                 "feedback_condition":
                     st.session_state.feedback_condition,
-                "feedback_type": "ai_generated_v0_6_test" if test_mode else "ai_generated_v0_6",
+                "feedback_type": "ai_generated_v0_7_test" if test_mode else "ai_generated_v0_7",
                 "feedback_text": st.session_state.feedback_text,
                 "feedback_word_count": len(
                     st.session_state.feedback_text.split()
